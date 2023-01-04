@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Text;
+using HardDrive;
 using NUnit.Framework;
+using SerDes;
 
 namespace SerDesTests
 {
@@ -11,15 +14,42 @@ namespace SerDesTests
         [SetUp]
         public void Setup()
         {
-            _serDes = new SerDes.SerDes(new HardDrive.HardDrive());
+            _serDes = new SerDes.SerDes();
         }
 
         [Test]
         public void Test1()
         {
-            _serDes.Write(new byte[] {1, 2, 3, 5, 6, 8});
-            Console.WriteLine(_serDes.Read(1));
-            Assert.Pass();
+            using (var stream = File.Open("test.txt", FileMode.OpenOrCreate))
+            {
+                var section = new BitmapSection(1);
+                section.OccupiedMask[0] = true;
+                var byteArray = section.OccupiedMask.ToByteArray();
+                _serDes.Write(stream, byteArray);
+            }
+
+            using (var stream = File.Open("test.txt", FileMode.OpenOrCreate))
+            {
+                var bytes = _serDes.Read(stream, (int) stream.Length);
+                // var parsed = bytes.To<bool[]>();
+                stream.Close();
+                Assert.Pass();
+            }
+        }
+
+        [Test]
+        public void Test2()
+        {
+            using (var stream = File.Open("test2.txt", FileMode.OpenOrCreate))
+            {
+                _serDes.Write(stream, "test".ToByteArray().ByteArrayToBinaryStr());
+            }
+
+            using (var stream = File.Open("test2.txt", FileMode.Open))
+            {
+                var chars = _serDes.Read(stream, (int) stream.Length);
+                var result = chars.BinaryCharsArrayToByteArray();
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ namespace HardDrive
 {
     public interface IHardDrive
     {
-        FileStream FileStream();
+        char[] Read(int toRead, int offset = 0);
+        void Write(byte[] toWrite, int offset = 0);
     }
 }

@@ -1,11 +1,14 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Text;
 
 namespace SerDes
 {
     public static class Utils
     {
+        const int CharsForByte = 8;
+
         // Convert an object to a byte array
         public static byte[] ObjectToByteArray(object obj)
         {
@@ -19,8 +22,6 @@ namespace SerDes
             return ms.ToArray();
         }
 
-        public static T ByteArrayToObject<T>(byte[] arrBytes) => (T) ByteArrayToObject(arrBytes);
-
         // Convert a byte array to an Object
         public static object ByteArrayToObject(byte[] arrBytes)
         {
@@ -32,10 +33,39 @@ namespace SerDes
 
             return obj;
         }
+
+        public static T ByteArrayToObject<T>(byte[] arrBytes) => (T) ByteArrayToObject(arrBytes);
+
+        public static string ByteArrayToStr(byte[] bytes)
+        {
+            var sb = new StringBuilder();
+            foreach (var singleByte in bytes)
+            {
+                sb.Append(Convert.ToString(singleByte, 2).PadLeft(CharsForByte, '0'));
+            }
+
+            return sb.ToString();
+        }
+
+        public static byte[] BinaryCharsArrayToByteArray(char[] c)
+        {
+            var result = new byte[c.Length / CharsForByte];
+            for (int i = 0, b = 0; i < c.Length; i += CharsForByte, b++)
+            {
+                var str = $"{c[i]}{c[i + 1]}{c[i + 2]}{c[i + 3]}{c[i + 4]}{c[i + 5]}{c[i + 6]}{c[i + 7]}";
+                result[b] = Convert.ToByte(str, 2);
+            }
+
+            return result;
+        }
     }
 
     public static class Extensions
     {
         public static byte[] ToByteArray(this object obj) => Utils.ObjectToByteArray(obj);
+        public static T To<T>(this byte[] byteArray) => Utils.ByteArrayToObject<T>(byteArray);
+        public static string ByteArrayToBinaryStr(this byte[] bytes) => Utils.ByteArrayToStr(bytes);
+        public static byte[] BinaryCharsArrayToByteArray(this char[] c) => Utils.BinaryCharsArrayToByteArray(c);
+
     }
 }

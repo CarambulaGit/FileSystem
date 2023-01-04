@@ -1,30 +1,31 @@
 ﻿using System.IO;
-using HardDrive;
 
 namespace SerDes
 {
-    public class SerDes
+    public class SerDes : ISerDes
     {
-        private readonly IHardDrive _hardDrive;
-
-        public SerDes(IHardDrive hardDrive)
+        public char[] Read(FileStream fileStream, int toRead, int offset = 0)
         {
-            _hardDrive = hardDrive;
-        }
-
-        public byte[] Read(int toRead, int offset = 0)
-        {
-            using BinaryReader b = new BinaryReader(_hardDrive.FileStream());
-            b.BaseStream.Seek(offset, SeekOrigin.Begin);
-            byte[] by = b.ReadBytes(toRead);
+            using StreamReader b = new StreamReader(fileStream);
+            // b.BaseStream.Seek(offset, SeekOrigin.Begin);
+            char[] by = new char[toRead]; 
+            b.Read(by, offset, toRead);
             return by;
         }
 
-        public void Write(byte[] toWrite, int offset = 0)
+        public void Write(FileStream fileStream, byte[] toWrite, long offset = 0)
         {
-            using BinaryWriter b = new BinaryWriter(_hardDrive.FileStream());
+            using StreamWriter b = new StreamWriter(fileStream);
             b.BaseStream.Seek(offset, SeekOrigin.Begin);
             b.Write(toWrite);
+        }
+
+        public void Write(FileStream fileStream, string str, long offset = 0)
+        {
+            // File.WriteAllBytes(); 
+            using StreamWriter b = new StreamWriter(fileStream);
+            b.BaseStream.Seek(offset, SeekOrigin.Begin);
+            b.Write(str);
         }
     }
 }

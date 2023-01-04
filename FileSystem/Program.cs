@@ -1,7 +1,7 @@
-﻿using System;
-using HardDrive;
+﻿using HardDrive;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SerDes;
 
 namespace FileSystem
 {
@@ -14,10 +14,10 @@ namespace FileSystem
 
         private static void SetupDI(string[] args)
         {
-            using IHost host = Host.CreateDefaultBuilder(args)
+            using var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices((_, services) =>
                     services.AddScoped<IHardDrive, HardDrive.HardDrive>()
-                        .AddTransient<SerDes.SerDes>())
+                        .AddTransient<ISerDes, SerDes.SerDes>())
                 .Build();
         }
     }
