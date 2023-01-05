@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
@@ -7,7 +9,8 @@ namespace SerDes
 {
     public static class Utils
     {
-        const int CharsForByte = 8;
+        public const int CharsForByte = 8;
+        private const string EmptyByte = "\0\0\0\0\0\0\0\0";
 
         // Convert an object to a byte array
         public static byte[] ObjectToByteArray(object obj)
@@ -53,6 +56,7 @@ namespace SerDes
             for (int i = 0, b = 0; i < c.Length; i += CharsForByte, b++)
             {
                 var str = $"{c[i]}{c[i + 1]}{c[i + 2]}{c[i + 3]}{c[i + 4]}{c[i + 5]}{c[i + 6]}{c[i + 7]}";
+                if (str.Equals(EmptyByte)) break;
                 result[b] = Convert.ToByte(str, 2);
             }
 
@@ -66,6 +70,29 @@ namespace SerDes
         public static T To<T>(this byte[] byteArray) => Utils.ByteArrayToObject<T>(byteArray);
         public static string ByteArrayToBinaryStr(this byte[] bytes) => Utils.ByteArrayToStr(bytes);
         public static byte[] BinaryCharsArrayToByteArray(this char[] c) => Utils.BinaryCharsArrayToByteArray(c);
+        public static bool IsNullOrEmpty<T>(this IEnumerable<T> collection) => collection == null || !collection.Any();
 
+        public static bool ContentsMatch<T>(this IEnumerable<T> first, IEnumerable<T> second)
+        {
+            if (first.IsNullOrEmpty() && second.IsNullOrEmpty()) return true;
+            if (first.IsNullOrEmpty() || second.IsNullOrEmpty()) return false;
+
+            var firstCount = first.Count();
+            var secondCount = second.Count();
+            if (firstCount != secondCount) return false;
+
+            foreach (var x1 in first)
+            {
+                if (!second.Contains(x1)) return false;
+            }
+
+            return true;
+        }
+
+        public static void FillWith<T>(this T[] array, Func<T> elemToFill)
+        {
+            for (var i = 0; i < array.Length; i++)
+                array[i] = elemToFill.Invoke();
+        }
     }
 }

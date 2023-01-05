@@ -23,18 +23,17 @@
         private (BitmapSection bitmap, InodesSection inodes, HardDriveSection hardDrive) InitializeSections(int inodeAmount, int dataBlocksAmount)
         {
             var bitmap = InitializeBitmap(dataBlocksAmount);
-            var inodes = InitializeInodes();
+            var inodes = InitializeInodes(inodeAmount);
             var hardDrive = InitializeHardDrive();
             return (bitmap, inodes, hardDrive);
         }
 
         private BitmapSection InitializeBitmap(int dataBlocksAmount)
         {
-            _hardDrive.Read(dataBlocksAmount);
-            return new BitmapSection(1); // todo
+            return new BitmapSection(dataBlocksAmount, _hardDrive, false); // todo
         }
-
-        private InodesSection InitializeInodes()
+        
+        private InodesSection InitializeInodes(int inodeAmount)
         {
             throw new System.NotImplementedException();
         }

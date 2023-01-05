@@ -20,12 +20,12 @@ namespace SerDes
             b.Write(toWrite);
         }
 
-        public void Write(FileStream fileStream, string str, long offset = 0)
+        public void Write(FileStream fileStream, string toWrite, long offset = 0)
         {
             // File.WriteAllBytes(); 
             using StreamWriter b = new StreamWriter(fileStream);
             b.BaseStream.Seek(offset, SeekOrigin.Begin);
-            b.Write(str);
+            b.Write(toWrite);
         }
     }
 }
