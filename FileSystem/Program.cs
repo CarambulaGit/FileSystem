@@ -16,9 +16,10 @@ namespace FileSystem
         {
             using var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices((_, services) =>
-                    services.AddScoped<IHardDrive, HardDrive.HardDrive>()
-                        .AddTransient<ISerDes, SerDes.SerDes>())
-                .Build();
+                    services.AddTransient<IHardDrive, HardDrive.HardDrive>()
+                        .AddTransient<ISerDes, SerDes.SerDes>()
+                        .AddTransient<IFileSystem, FileSystem>()
+                ).Build();
         }
     }
 }

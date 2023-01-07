@@ -3,44 +3,31 @@
     public class SectionSplitter
     {
         private readonly IHardDrive _hardDrive;
+        private bool _initFromDrive;
         public BitmapSection BitmapSection { get; private set; }
         public InodesSection InodesSection { get; private set; }
-        public HardDriveSection HardDriveSection { get; private set; }
+        public DataBlocksSection DataBlocksSection { get; private set; }
 
-        public SectionSplitter(IHardDrive hardDrive)
+        public SectionSplitter(IHardDrive hardDrive, bool initFromDrive = false)
         {
+            _initFromDrive = initFromDrive;
             _hardDrive = hardDrive;
         }
 
         public void SplitSections(int inodeAmount, int dataBlocksAmount)
         {
-            var sections = InitializeSections(inodeAmount, dataBlocksAmount);
-            BitmapSection = sections.bitmap;
-            InodesSection = sections.inodes;
-            HardDriveSection = sections.hardDrive;
+            BitmapSection = InitializeBitmap(dataBlocksAmount);
+            InodesSection = InitializeInodes(inodeAmount, BitmapSection.Length());
+            DataBlocksSection = InitializeHardDrive(dataBlocksAmount, BitmapSection.Length(), InodesSection.Length());
         }
 
-        private (BitmapSection bitmap, InodesSection inodes, HardDriveSection hardDrive) InitializeSections(int inodeAmount, int dataBlocksAmount)
-        {
-            var bitmap = InitializeBitmap(dataBlocksAmount);
-            var inodes = InitializeInodes(inodeAmount);
-            var hardDrive = InitializeHardDrive();
-            return (bitmap, inodes, hardDrive);
-        }
+        private BitmapSection InitializeBitmap(int dataBlocksAmount) =>
+            new BitmapSection(dataBlocksAmount, _hardDrive, _initFromDrive);
 
-        private BitmapSection InitializeBitmap(int dataBlocksAmount)
-        {
-            return new BitmapSection(dataBlocksAmount, _hardDrive, false); // todo
-        }
-        
-        private InodesSection InitializeInodes(int inodeAmount)
-        {
-            throw new System.NotImplementedException();
-        }
+        private InodesSection InitializeInodes(int inodeAmount, int bitmapSize) =>
+            new InodesSection(inodeAmount, _hardDrive, bitmapSize, _initFromDrive);
 
-        private HardDriveSection InitializeHardDrive()
-        {
-            throw new System.NotImplementedException();
-        }
+        private DataBlocksSection InitializeHardDrive(int dataBlocksAmount, int bitmapSize, int inodesSize) =>
+            new DataBlocksSection(dataBlocksAmount, _hardDrive, bitmapSize, inodesSize, _initFromDrive);
     }
 }

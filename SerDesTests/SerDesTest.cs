@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using HardDrive;
 using NUnit.Framework;
@@ -95,6 +97,12 @@ namespace SerDesTests
             section.WriteBlock(0, "TestDataBlocks");
             var section2 = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, true);
             Console.WriteLine(section.ReadBlock(0).ContentsMatch(section2.ReadBlock(0)));
+        }
+
+        [Test]
+        public void Test()
+        {
+           Console.WriteLine(FileType.RegularFile.ToString());
         }
     }
 }

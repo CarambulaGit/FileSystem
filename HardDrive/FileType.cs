@@ -1,4 +1,6 @@
-﻿namespace HardDrive
+﻿using System;
+
+namespace HardDrive
 {
     public enum FileType : byte
     {

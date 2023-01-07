@@ -18,6 +18,8 @@ namespace HardDrive
             _inodesSize = inodesSize;
         }
 
+        public override int Length() => Size * DataBlock.BlockSize;
+
         public override byte[] ReadSection() => Array.Empty<byte>();
 
         public override void SaveSection() { }

@@ -10,14 +10,17 @@ namespace HardDrive
         private int _bitmapSize;
         public Inode[] Inodes { get; private set; }
 
-        public InodesSection(int size, IHardDrive hardDrive, int bitmapSize, bool initFromDrive = false) : base(size, hardDrive,
+        public InodesSection(int size, IHardDrive hardDrive, int bitmapSize, bool initFromDrive = false) : base(size,
+            hardDrive,
             initFromDrive)
         {
             _bitmapSize = bitmapSize;
         }
 
+        public override int Length() => Inode.InodeSize * Size;
+
         public override byte[] ReadSection() =>
-            HardDrive.Read(Inode.InodeSize * Size, _bitmapSize).BinaryCharsArrayToByteArray();
+            HardDrive.Read(Length(), _bitmapSize).BinaryCharsArrayToByteArray();
 
         public override void SaveSection()
         {

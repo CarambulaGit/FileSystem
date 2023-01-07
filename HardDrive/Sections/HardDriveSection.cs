@@ -24,6 +24,7 @@ namespace HardDrive
             }
         }
 
+        public abstract int Length(); // size in bites
         public abstract byte[] ReadSection();
         public abstract void SaveSection();
 

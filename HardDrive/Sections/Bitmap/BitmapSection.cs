@@ -6,16 +6,18 @@ namespace HardDrive
     [Serializable]
     public class BitmapSection : HardDriveSection
     {
-        private const int EmptyArraySize = 224;
-        private const int ArrayElemSize = 8;
+        private const int EmptyArrayLength = 224;
+        private const int ArrayElemLength = 8;
 
         public bool[] OccupiedMask { get; private set; }
 
         public BitmapSection(int size, IHardDrive hardDrive, bool initFromDrive = false) : base(size, hardDrive,
             initFromDrive) { }
 
+        public override int Length() => EmptyArrayLength + ArrayElemLength * Size;
+
         public override byte[] ReadSection() =>
-            HardDrive.Read(EmptyArraySize + ArrayElemSize * Size).BinaryCharsArrayToByteArray();
+            HardDrive.Read(Length()).BinaryCharsArrayToByteArray();
 
         public override void SaveSection() => HardDrive.Write(OccupiedMask.ToByteArray());
 
