@@ -17,7 +17,7 @@ namespace HardDrive
             _bitmapSize = bitmapSize;
         }
 
-        public override int Length() => Inode.InodeSize * Size;
+        public override int Length() => Inode.InodeLength * Size;
 
         public override byte[] ReadSection() =>
             HardDrive.Read(Length(), _bitmapSize).BinaryCharsArrayToByteArray();
@@ -41,7 +41,7 @@ namespace HardDrive
 
         protected override void InitFromData(byte[] data)
         {
-            var inodeByteSize = Inode.InodeByteSize;
+            var inodeByteSize = Inode.InodeByteLength;
             Inodes = new Inode[data.Length / inodeByteSize];
             for (int i = 0, b = 0; i < data.Length; i += inodeByteSize, b++)
             {

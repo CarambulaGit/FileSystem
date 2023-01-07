@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using SerDes;
 
 namespace HardDrive
@@ -6,10 +7,10 @@ namespace HardDrive
     [Serializable]
     public class Inode
     {
-        public const int InodeSize = InodeByteSize * 8;
-        public const int InodeByteSize = 512;
+        public const int InodeLength = InodeByteLength * 8;
+        public const int InodeByteLength = 512;
         public int Id { get; set; }
-        public string FileName { get; set; } = string.Empty;
+        public List<string> FileNames { get; set; } = new List<string>();
         public FileType FileType { get; set; }
         public int LinksCount { get; set; }
         public int FileSize { get; set; }
@@ -17,7 +18,7 @@ namespace HardDrive
 
         public bool IsOccupied => LinksCount > 0;
 
-        public string GetBinaryStr() => this.ToByteArray().ByteArrayToBinaryStr().PadRight(InodeSize, '0');
+        public string GetBinaryStr() => this.ToByteArray().ByteArrayToBinaryStr().PadRight(InodeLength, '0');
 
         public override bool Equals(object obj)
         {
@@ -27,7 +28,7 @@ namespace HardDrive
             }
 
             return Id.Equals(item.Id) &&
-                   FileName.Equals(item.FileName) &&
+                   FileNames.Equals(item.FileNames) &&
                    FileType.Equals(item.FileType) &&
                    LinksCount.Equals(item.LinksCount) &&
                    FileSize.Equals(item.FileSize) &&

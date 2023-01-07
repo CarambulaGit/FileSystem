@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using SerDes;
 
 namespace HardDrive
@@ -10,6 +11,8 @@ namespace HardDrive
         private const int ArrayElemLength = 8;
 
         public bool[] OccupiedMask { get; private set; }
+
+        public int FreeBlocksAmount => OccupiedMask.Count(elem => elem == false);
 
         public BitmapSection(int size, IHardDrive hardDrive, bool initFromDrive = false) : base(size, hardDrive,
             initFromDrive) { }

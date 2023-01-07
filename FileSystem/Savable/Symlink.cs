@@ -4,7 +4,6 @@ using SerDes;
 
 namespace FileSystem.Savable
 {
-    [Serializable]
     public class Symlink : Savable<Symlink.SymlinkContent>
     {
         [Serializable]

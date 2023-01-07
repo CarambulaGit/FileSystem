@@ -1,10 +1,10 @@
 ﻿using System;
+using System.Runtime.Serialization;
 using HardDrive;
 
 namespace FileSystem.Savable
 {
-    [Serializable]
-    public abstract class Savable<T>
+    public abstract class Savable<T> : ISerializable
     {
         public Inode Inode { get; private set; }
         public byte[] Content { get; set; }
@@ -18,5 +18,10 @@ namespace FileSystem.Savable
         }
 
         public abstract T GetContent();
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue(nameof(Content), Content);
+        }
     }
 }
