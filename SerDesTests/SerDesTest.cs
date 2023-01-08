@@ -3,6 +3,7 @@ using System.IO;
 using HardDrive;
 using NUnit.Framework;
 using SerDes;
+using Utils;
 
 namespace SerDesTests
 {
@@ -71,7 +72,7 @@ namespace SerDesTests
             var hardDrive = new HardDrive.HardDrive(_serDes, "test4.txt");
             var section = new BitmapSection(1, hardDrive, false);
             var section2 = new BitmapSection(1, hardDrive, true);
-            Console.WriteLine(section.OccupiedMask.ContentsMatch(section2.OccupiedMask));
+            Assert.IsTrue(section.OccupiedMask.ContentsMatch(section2.OccupiedMask));
         }
 
         [Test]
@@ -80,8 +81,13 @@ namespace SerDesTests
             var hardDrive = new HardDrive.HardDrive(_serDes, "test5.txt");
             var bitmapSize = 0;
             var section = new InodesSection(1, hardDrive, bitmapSize, false);
+            section.Inodes[0].OccupiedDataBlocks = new BlockAddress[]
+            {
+                new BlockAddress(1),
+            };
+            section.SaveInode(section.Inodes[0]);
             var section2 = new InodesSection(1, hardDrive, bitmapSize, true);
-            Console.WriteLine(section.Inodes.ContentsMatch(section2.Inodes));
+            Assert.IsTrue(section.Inodes.ContentsMatch(section2.Inodes));
         }
 
         [Test]
@@ -93,7 +99,7 @@ namespace SerDesTests
             var section = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, false);
             section.WriteBlock(0, "TestDataBlocks");
             var section2 = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, true);
-            Console.WriteLine(section.ReadBlock(0).ContentsMatch(section2.ReadBlock(0)));
+            Assert.IsTrue(section.ReadBlock(0).ContentsMatch(section2.ReadBlock(0)));
         }
     }
 }

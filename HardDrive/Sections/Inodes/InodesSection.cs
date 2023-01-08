@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Linq;
 using System.Text;
 using SerDes;
+using Utils;
 
 namespace HardDrive
 {
@@ -19,6 +21,8 @@ namespace HardDrive
 
         public override int Length() => Inode.InodeLength * Size;
 
+        public int FreeInodesAmount() => Inodes.Count(inode => !inode.IsOccupied);
+
         public override byte[] ReadSection() =>
             HardDrive.Read(Length(), _bitmapSize).BinaryCharsArrayToByteArray();
 
@@ -33,19 +37,24 @@ namespace HardDrive
             HardDrive.Write(sb.ToString(), _bitmapSize);
         }
 
+        public void SaveInode(Inode inode) =>
+            HardDrive.Write(inode.GetBinaryStr(), _bitmapSize + inode.Id * Inode.InodeLength);
+
+        public Inode GetFreeInode() => Inodes.FirstOrDefault(elem => !elem.IsOccupied);
+
         protected override void InitData()
         {
             Inodes = new Inode[Size];
-            Inodes.FillWith(() => new Inode());
+            Inodes.FillWith(i => new Inode {Id = i});
         }
 
         protected override void InitFromData(byte[] data)
         {
-            var inodeByteSize = Inode.InodeByteLength;
-            Inodes = new Inode[data.Length / inodeByteSize];
-            for (int i = 0, b = 0; i < data.Length; i += inodeByteSize, b++)
+            var inodeByteLength = Inode.InodeByteLength;
+            Inodes = new Inode[data.Length / inodeByteLength];
+            for (int i = 0, b = 0; i < data.Length; i += inodeByteLength, b++)
             {
-                Inodes[b] = data[i..(i + inodeByteSize)].To<Inode>();
+                Inodes[b] = data[i..(i + inodeByteLength)].To<Inode>();
             }
         }
     }

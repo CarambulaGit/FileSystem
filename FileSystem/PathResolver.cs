@@ -1,10 +1,12 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using FileSystem.Savable;
 using HardDrive;
 using SerDes;
+using Utils;
 using Directory = FileSystem.Savable.Directory;
 
 namespace FileSystem
@@ -20,41 +22,38 @@ namespace FileSystem
 
         private const string ContentGroupName = "content";
 
-        private readonly FileSystem _fileSystem;
+        private readonly Lazy<IFileSystem> _fileSystem;
+        private IFileSystem FileSystem => _fileSystem.Value;
 
-        public PathResolver(FileSystem fileSystem)
+        public PathResolver(Lazy<IFileSystem> fileSystem)
         {
             _fileSystem = fileSystem;
         }
 
-        public string Resolve(string path)
-        {
-            return ResolveAbsolutePath(
-                IsPathAbsolute(path)
-                    ? path
-                    : Path.Combine(GetWorkingDirectoryPath(), path)
+        public string Resolve(string path) =>
+            ResolveAbsolutePath(IsPathAbsolute(path)
+                ? path
+                : Path.Combine(GetWorkingDirectoryPath(), path)
             );
-        }
 
         public string Resolve(Directory directory)
         {
-            Inode GetInodeById(int curParentInodeId) => _fileSystem.InodesSection.Inodes[curParentInodeId];
+            Inode GetInodeById(int curParentInodeId) => FileSystem.InodesSection.Inodes[curParentInodeId];
 
-            if (directory == _fileSystem.RootDirectory)
+            if (directory == FileSystem.RootDirectory)
             {
                 return FileSystem.RootDirectoryPath;
             }
 
             var sb = new StringBuilder();
             var curParentInode = GetInodeById(directory.GetParentDirectoryInodeId());
-            while (curParentInode.Id != _fileSystem.RootDirectory.Inode.Id)
+            while (curParentInode.Id != FileSystem.RootDirectory.Inode.Id)
             {
                 sb.Append(curParentInode.FileNames[0]);
-                var parentDir = new Savable.Directory(curParentInode);
+                var parentDir = new Directory(curParentInode);
                 curParentInode = GetInodeById(parentDir.GetParentDirectoryInodeId());
             }
 
-            
             // todo check
             return sb.ToString();
         }
@@ -90,7 +89,7 @@ namespace FileSystem
             path = sb.ToString();
         }
 
-        private string GetWorkingDirectoryPath() => Resolve(_fileSystem.CurrentDirectory);
+        private string GetWorkingDirectoryPath() => Resolve(FileSystem.CurrentDirectory);
     }
 
     public interface IPathResolver

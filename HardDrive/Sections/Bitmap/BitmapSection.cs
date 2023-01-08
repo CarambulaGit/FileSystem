@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using SerDes;
+using Utils;
 
 namespace HardDrive
 {
@@ -25,6 +26,9 @@ namespace HardDrive
         public override void SaveSection() => HardDrive.Write(OccupiedMask.ToByteArray());
 
         protected override void InitData() => OccupiedMask = new bool[Size];
+
+        public int GetFreeBlockIndex() => OccupiedMask.IndexOf(elem => elem == false);
+
         protected override void InitFromData(byte[] data) => OccupiedMask = data.To<bool[]>();
     }
 }

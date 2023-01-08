@@ -18,11 +18,13 @@ namespace HardDrive
             _inodesSize = inodesSize;
         }
 
-        public override int Length() => Size * DataBlock.BlockSize;
+        public override int Length() => Size * DataBlock.BlockLength;
 
         public override byte[] ReadSection() => Array.Empty<byte>();
 
         public override void SaveSection() { }
+
+        public DataBlock GetDataBlock(int index) => _dataBlocks[index];
 
         public byte[] ReadBlock(int index)
         {
@@ -36,11 +38,7 @@ namespace HardDrive
             _dataBlocks[index].Write(toWrite);
         }
 
-        public void WriteBlock(int index, string toWrite)
-        {
-            CheckBlock(index);
-            _dataBlocks[index].Write(toWrite.ToByteArray());
-        }
+        public void WriteBlock(int index, string toWrite) => WriteBlock(index, toWrite.ToByteArray());
 
         protected override void InitData() => InitDataBlocks();
         protected override void InitFromData(byte[] data) => InitDataBlocks();
@@ -51,7 +49,7 @@ namespace HardDrive
             var prevSectionsOffset = _bitmapSize + _inodesSize;
             for (var i = 0; i < _dataBlocks.Length; i++)
             {
-                _dataBlocks[i] = new DataBlock(HardDrive, prevSectionsOffset + i * DataBlock.BlockSize);
+                _dataBlocks[i] = new DataBlock(HardDrive, prevSectionsOffset + i * DataBlock.BlockLength);
             }
         }
 

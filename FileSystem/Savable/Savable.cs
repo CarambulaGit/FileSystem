@@ -17,6 +17,8 @@ namespace FileSystem.Savable
             Inode = inode;
         }
 
+        public abstract int LinksCountDefault();
+
         public abstract T GetContent();
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)

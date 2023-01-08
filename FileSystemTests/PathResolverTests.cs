@@ -20,6 +20,7 @@ namespace PathResolverTests
         [TestCase("/bad///..", "//")]
         [TestCase("/bad/././..", "/./.")]
         [TestCase("/bad/../../..", "")]
+        [TestCase("/bad/../guy/../..", "")]
         public void RemoveDoubleDotsTest(string path, string result)
         {
             RemoveDoubleDots(ref path);

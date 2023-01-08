@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using SerDes;
+using Utils;
 
 namespace HardDrive
 {
@@ -8,12 +9,12 @@ namespace HardDrive
     public class Inode
     {
         public const int InodeLength = InodeByteLength * 8;
-        public const int InodeByteLength = 512;
+        public const int InodeByteLength = 1024;
         public int Id { get; set; }
         public List<string> FileNames { get; set; } = new List<string>();
-        public FileType FileType { get; set; }
+        public FileType FileType { get; set; } = FileType.None;
         public int LinksCount { get; set; }
-        public int FileSize { get; set; }
+        public int FileSize => OccupiedDataBlocks.Length * InodeByteLength;
         public BlockAddress[] OccupiedDataBlocks { get; set; } = Array.Empty<BlockAddress>();
 
         public bool IsOccupied => LinksCount > 0;
@@ -28,10 +29,9 @@ namespace HardDrive
             }
 
             return Id.Equals(item.Id) &&
-                   FileNames.Equals(item.FileNames) &&
+                   FileNames.ContentsMatch(item.FileNames) &&
                    FileType.Equals(item.FileType) &&
                    LinksCount.Equals(item.LinksCount) &&
-                   FileSize.Equals(item.FileSize) &&
                    OccupiedDataBlocks.ContentsMatch(item.OccupiedDataBlocks);
         }
     }

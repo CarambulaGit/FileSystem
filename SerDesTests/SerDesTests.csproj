@@ -16,6 +16,7 @@
     <ItemGroup>
       <ProjectReference Include="..\HardDrive\HardDrive.csproj" />
       <ProjectReference Include="..\SerDes\SerDes.csproj" />
+      <ProjectReference Include="..\Utils\Utils.csproj" />
     </ItemGroup>
 
 </Project>

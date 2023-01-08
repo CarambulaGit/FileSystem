@@ -70,29 +70,5 @@ namespace SerDes
         public static T To<T>(this byte[] byteArray) => Utils.ByteArrayToObject<T>(byteArray);
         public static string ByteArrayToBinaryStr(this byte[] bytes) => Utils.ByteArrayToStr(bytes);
         public static byte[] BinaryCharsArrayToByteArray(this char[] c) => Utils.BinaryCharsArrayToByteArray(c);
-        public static bool IsNullOrEmpty<T>(this IEnumerable<T> collection) => collection == null || !collection.Any();
-
-        public static bool ContentsMatch<T>(this IEnumerable<T> first, IEnumerable<T> second)
-        {
-            if (first.IsNullOrEmpty() && second.IsNullOrEmpty()) return true;
-            if (first.IsNullOrEmpty() || second.IsNullOrEmpty()) return false;
-
-            var firstCount = first.Count();
-            var secondCount = second.Count();
-            if (firstCount != secondCount) return false;
-
-            foreach (var x1 in first)
-            {
-                if (!second.Contains(x1)) return false;
-            }
-
-            return true;
-        }
-
-        public static void FillWith<T>(this T[] array, Func<T> elemToFill)
-        {
-            for (var i = 0; i < array.Length; i++)
-                array[i] = elemToFill.Invoke();
-        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using FileSystem.Exceptions;
 using HardDrive;
 
 namespace FileSystem.Savable

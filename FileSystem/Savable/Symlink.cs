@@ -6,6 +6,8 @@ namespace FileSystem.Savable
 {
     public class Symlink : Savable<Symlink.SymlinkContent>
     {
+        private const int DefaultLinksCount = 1;
+
         [Serializable]
         public struct SymlinkContent
         {
@@ -13,6 +15,8 @@ namespace FileSystem.Savable
         }
 
         public Symlink(Inode inode) : base(inode) { }
+
+        public override int LinksCountDefault() => DefaultLinksCount;
 
         public override SymlinkContent GetContent() => Content.To<SymlinkContent>();
     }

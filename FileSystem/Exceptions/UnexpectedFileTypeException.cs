@@ -1,7 +1,7 @@
 using System;
 using HardDrive;
 
-namespace FileSystem.Savable
+namespace FileSystem.Exceptions
 {
     public class UnexpectedFileTypeException : Exception
     {
