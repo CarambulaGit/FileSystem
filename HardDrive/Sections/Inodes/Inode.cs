@@ -32,7 +32,7 @@ namespace HardDrive
                    FileNames.ContentsMatch(item.FileNames) &&
                    FileType.Equals(item.FileType) &&
                    LinksCount.Equals(item.LinksCount) &&
-                   OccupiedDataBlocks.ContentsMatch(item.OccupiedDataBlocks);
+                   OccupiedDataBlocks.ContentsMatchOrdered(item.OccupiedDataBlocks);
         }
     }
 }

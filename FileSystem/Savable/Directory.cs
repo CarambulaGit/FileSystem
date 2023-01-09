@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using HardDrive;
 using SerDes;
+using Utils;
 
 namespace FileSystem.Savable
 {
@@ -14,6 +15,16 @@ namespace FileSystem.Savable
         public struct DirectoryContent
         {
             [NotNull] public List<int> ChildrenInodeIds { get; set; }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is not DirectoryContent item)
+                {
+                    return false;
+                }
+
+                return ChildrenInodeIds.ContentsMatchOrdered(item.ChildrenInodeIds);
+            }
         }
 
         public Directory(Inode inode) : base(inode) { }

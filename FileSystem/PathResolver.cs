@@ -50,7 +50,7 @@ namespace FileSystem
             while (curParentInode.Id != FileSystem.RootDirectory.Inode.Id)
             {
                 sb.Append(curParentInode.FileNames[0]);
-                var parentDir = new Directory(curParentInode);
+                var parentDir = FileSystem.ReadDirectory(curParentInode);
                 curParentInode = GetInodeById(parentDir.GetParentDirectoryInodeId());
             }
 

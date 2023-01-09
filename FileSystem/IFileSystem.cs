@@ -17,11 +17,11 @@ namespace FileSystem
         DataBlocksSection DataBlocksSection { get; }
         void Initialize();
         Directory CreateDirectory(string name, string path);
-        void ReadDirectory();
+        Directory ReadDirectory(Inode inode);
         void SaveDirectory(Directory directory);
         void DeleteDirectory();
         RegularFile CreateFile(string name);
-        void ReadFile();
+        RegularFile ReadFile(Inode inode);
         void SaveFile();
         void DeleteFile();
     }

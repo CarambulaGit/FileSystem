@@ -6,6 +6,7 @@ using FileSystem.Exceptions;
 using FileSystem.Savable;
 using HardDrive;
 using SerDes;
+using Utils;
 using Directory = FileSystem.Savable.Directory;
 
 namespace FileSystem
@@ -14,7 +15,7 @@ namespace FileSystem
     {
         #region Fields
 
-        private const int RootFolderInodeId = 0;
+        public const int RootFolderInodeId = 0;
         private readonly IHardDrive _hardDrive;
         private readonly IPathResolver _pathResolver;
         private readonly SectionSplitter _sectionSplitter;
@@ -71,19 +72,11 @@ namespace FileSystem
         {
             var freeInode = InodesSection.Inodes[RootFolderInodeId];
             var directory = new Directory(freeInode, freeInode.Id);
-            var splitData = SplitForDataBlocks(directory.Content).ToArray();
-            _ = GetFreeDataBlocks(splitData.Length, out var indexes);
-            var blockAddresses = indexes.Select(index => new BlockAddress(index)).ToArray();
-            freeInode.OccupiedDataBlocks = blockAddresses;
             freeInode.LinksCount = directory.LinksCountDefault();
             freeInode.FileNames.Add(RootName);
+            freeInode.FileType = FileType.Directory;
             InodesSection.SaveInode(freeInode);
-
-            for (var i = 0; i < splitData.Length; i++)
-            {
-                DataBlocksSection.WriteBlock(blockAddresses[i].Address, splitData[i]);
-            }
-
+            SaveDirectory(directory);
             return directory;
         }
 
@@ -105,41 +98,52 @@ namespace FileSystem
             }
 
             var freeInode = GetFreeInode();
-            var parentFolder = new Directory(parentFolderInode);
-            parentFolder.Content = parentFolder.GetContent().ChildrenInodeIds.Append(freeInode.Id).ToByteArray();
+            var parentFolder = ReadDirectory(parentFolderInode);
+            var dirContent = parentFolder.GetContent();
+            dirContent.ChildrenInodeIds.Add(freeInode.Id);
+            parentFolder.Content = dirContent.ToByteArray();
             SaveDirectory(parentFolder);
+            parentFolder.Inode.LinksCount++;
+            InodesSection.SaveInode(parentFolder.Inode);
             var newFolder = new Directory(freeInode, parentFolderInode.Id);
             freeInode.LinksCount = newFolder.LinksCountDefault();
             freeInode.FileNames.Add(name);
+            freeInode.FileType = FileType.Directory;
+            SaveDirectory(newFolder);
+            CreationCallback(parentFolder);
             return newFolder;
         }
 
-        public void ReadDirectory()
+        public Directory ReadDirectory(Inode inode)
         {
-            // todo
+            var blocksContent = GetDataBlocksContent(inode);
+            var directory = new Directory(inode)
+            {
+                Content = blocksContent
+            };
+            return directory;
         }
 
         public void SaveDirectory(Directory directory)
         {
             var occupiedBlocks = directory.Inode.OccupiedDataBlocks;
-            var splitData = SplitForDataBlocks(directory.Content).ToArray();
+            var splitData = SplitForDataBlocks(directory.Content.ByteArrayToBinaryStr()).ToArray();
             if (occupiedBlocks.Length > splitData.Length)
             {
                 directory.Inode.OccupiedDataBlocks = occupiedBlocks[..splitData.Length];
-                InodesSection.SaveInode(directory.Inode);
-                occupiedBlocks = directory.Inode.OccupiedDataBlocks;
             }
 
             if (occupiedBlocks.Length < splitData.Length)
             {
                 var additionalBlocksAmount = splitData.Length - occupiedBlocks.Length;
                 _ = GetFreeDataBlocks(additionalBlocksAmount, out var indexes);
+                BitmapSection.SetOccupied(indexes);
                 var blockAddresses = indexes.Select(index => new BlockAddress(index));
                 directory.Inode.OccupiedDataBlocks = occupiedBlocks.Concat(blockAddresses).ToArray();
-                InodesSection.SaveInode(directory.Inode);
-                occupiedBlocks = directory.Inode.OccupiedDataBlocks;
             }
 
+            InodesSection.SaveInode(directory.Inode);
+            occupiedBlocks = directory.Inode.OccupiedDataBlocks;
             for (var i = 0; i < splitData.Length; i++)
             {
                 DataBlocksSection.WriteBlock(occupiedBlocks[i].Address, splitData[i]);
@@ -160,12 +164,18 @@ namespace FileSystem
         public RegularFile CreateFile(string name)
         {
             throw new NotImplementedException();
+            // CreationCallback();
             // todo
         }
 
-        public void ReadFile()
+        public RegularFile ReadFile(Inode inode)
         {
-            // todo
+            var blocksContent = GetDataBlocksContent(inode);
+            var file = new RegularFile(inode)
+            {
+                Content = blocksContent
+            };
+            return file;
         }
 
         public void SaveFile()
@@ -196,6 +206,11 @@ namespace FileSystem
 
         private DataBlock GetFreeDataBlock(out int index)
         {
+            if (BitmapSection.FreeBlocksAmount == 0)
+            {
+                throw new NotEnoughDataBlocksException();
+            }
+
             index = BitmapSection.GetFreeBlockIndex();
             return DataBlocksSection.GetDataBlock(index);
         }
@@ -208,10 +223,10 @@ namespace FileSystem
             }
 
             var result = new DataBlock[amount];
-            indexes = new int[amount];
+            indexes = BitmapSection.GetFreeBlocksIndexes(amount);
             for (var i = 0; i < result.Length; i++)
             {
-                result[i] = GetFreeDataBlock(out indexes[i]);
+                result[i] = DataBlocksSection.GetDataBlock(indexes[i]);
             }
 
             return result;
@@ -229,7 +244,7 @@ namespace FileSystem
                 throw new IncorrectInodeTypeException(inode, desiredType);
             }
 
-            return new Directory(inode);
+            return ReadDirectory(inode);
         }
 
         private RegularFile ConstructRegularFileFromInode(Inode inode)
@@ -240,7 +255,7 @@ namespace FileSystem
                 throw new IncorrectInodeTypeException(inode, desiredType);
             }
 
-            return new RegularFile(inode);
+            return ReadFile(inode);
         }
 
         private Symlink ConstructSymlinkFromInode(Inode inode)
@@ -260,7 +275,7 @@ namespace FileSystem
         {
             reason = string.Empty;
             parentInode = null;
-            var pathParts = path.Split(Path.AltDirectorySeparatorChar);
+            var pathParts = path.Split(Path.AltDirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
             var currentDirectory = RootDirectory;
             Dictionary<string, Inode> namesWithInodes;
             for (int i = 0; i < pathParts.Length; i++)
@@ -273,7 +288,7 @@ namespace FileSystem
                     return false;
                 }
 
-                currentDirectory = new Directory(inode);
+                currentDirectory = ReadDirectory(inode);
             }
 
             namesWithInodes = GetNamesWithInodes(currentDirectory);
@@ -289,18 +304,43 @@ namespace FileSystem
 
         private Dictionary<string, Inode> GetNamesWithInodes(Directory directory)
         {
-            var childrenIds = directory.GetContent().ChildrenInodeIds;
-            var childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
-            var namesWithInodes =
-                childrenInodes.SelectMany(inodes => inodes.FileNames, (inode, fileName) => (fileName, inode))
+            var rawChildrenIds = directory.GetContent().ChildrenInodeIds;
+            Dictionary<string, Inode> namesWithInodes;
+            if (rawChildrenIds.Count > 2)
+            {
+                var childrenIds = rawChildrenIds.GetRangeByStartIndex(2);
+                var childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
+                namesWithInodes = childrenInodes
+                    .SelectMany(inodes => inodes.FileNames, (inode, fileName) => (fileName, inode))
                     .ToDictionary(tuple => tuple.fileName, tuple => tuple.inode);
+            }
+            else
+            {
+                namesWithInodes = new Dictionary<string, Inode>();
+            }
+
             return namesWithInodes;
         }
 
-        private IEnumerable<byte[]> SplitForDataBlocks(byte[] data)
+        private byte[] GetDataBlocksContent(Inode inode)
+        {
+            var indexes = inode.OccupiedDataBlocks
+                .Select(addressContainer => addressContainer.Address).ToArray();
+
+            var blocksContents = new char[indexes.Length][];
+            for (var i = 0; i < indexes.Length; i++)
+            {
+                blocksContents[i] = DataBlocksSection.ReadBlock(indexes[i]);
+            }
+
+            var blocksContent = blocksContents.SelectMany(bytes => bytes).ToArray().BinaryCharsArrayToByteArray();
+            return blocksContent;
+        }
+
+        private string[] SplitForDataBlocks(string data)
         {
             var dataBlockLength = DataBlock.BlockLength;
-            var result = new byte[(int) Math.Ceiling((float) data.Length / dataBlockLength)][];
+            var result = new string[(int) Math.Ceiling((float) data.Length / dataBlockLength)];
             for (int i = 0, b = 0; i < data.Length; i += dataBlockLength, b++)
             {
                 result[b] = i + dataBlockLength > data.Length
@@ -309,6 +349,14 @@ namespace FileSystem
             }
 
             return result;
+        }
+        
+        private void CreationCallback(Directory parentFolder)
+        {
+            if (parentFolder.Inode.Id == RootFolderInodeId)
+            {
+                RootDirectory = parentFolder;
+            }
         }
     }
 }

@@ -7,7 +7,7 @@ namespace HardDrive
     {
         public const string DataFileName = "data.txt";
         private readonly ISerDes _serDes;
-        private string _fileName;
+        private readonly string _fileName;
 
         public HardDrive(ISerDes serDes, string fileName = DataFileName)
         {

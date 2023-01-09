@@ -1,14 +1,25 @@
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
+using System;
+using FileSystem;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
 namespace PathResolverTests
 {
     public class PathResolverTests
     {
+        private IFileSystem _fileSystem;
+        private IPathResolver _pathResolver;
+        private IServiceProvider _services;
+
         [SetUp]
-        public void Setup() { }
+        public void Setup()
+        {
+            (int inodesAmount, int dataBlocksAmount, bool initFromDrive) fileSystemConfiguration = (20, 40, false);
+            _services = Program.SetupDI(Array.Empty<string>(), fileSystemConfiguration);
+            _fileSystem = _services.GetRequiredService<IFileSystem>();
+            _pathResolver = _services.GetRequiredService<IPathResolver>();
+            _fileSystem.Initialize();
+        }
 
         [Test]
         [TestCase("/", "/")]
@@ -23,30 +34,8 @@ namespace PathResolverTests
         [TestCase("/bad/../guy/../..", "")]
         public void RemoveDoubleDotsTest(string path, string result)
         {
-            RemoveDoubleDots(ref path);
+            // _pathResolver.RemoveDoubleDots(ref path);
             Assert.AreEqual(result, path);
-        }
-        
-        private const string DoubleDotPattern =
-            @"(\/(?!(?:\.(?:\/|\.\/))|(?:\/))[^\/]*(?=\/))*(?<" + ContentGroupName +
-            @">(?:\/\.(?:(?=\/)))|\/+)*(\/\.\.(?:(?=\/)|(?=$)))";
-
-        private const string ContentGroupName = "content";
-
-        private void RemoveDoubleDots(ref string path)
-        {
-            var sb = new StringBuilder(path);
-            var regex = new Regex(DoubleDotPattern);
-            var match = regex.Match(sb.ToString());
-            while (match.Success)
-            {
-                var newValue = string.Join(string.Empty,
-                    match.Groups[ContentGroupName].Captures.Select(capture => capture.Value));
-                sb.Replace(match.Value, newValue);
-                match = regex.Match(sb.ToString());
-            }
-
-            path = sb.ToString();
         }
     }
 }

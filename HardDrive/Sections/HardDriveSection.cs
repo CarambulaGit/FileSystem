@@ -5,6 +5,7 @@ namespace HardDrive
     [Serializable]
     public abstract class HardDriveSection
     {
+        private bool _initFromDrive;
         public int Size { get; private set; }
         public IHardDrive HardDrive { get; private set; }
 
@@ -12,7 +13,12 @@ namespace HardDrive
         {
             Size = size;
             HardDrive = hardDrive;
-            if (initFromDrive)
+            _initFromDrive = initFromDrive;
+        }
+
+        protected void Initialize()
+        {
+            if (_initFromDrive)
             {
                 var data = ReadSection();
                 InitFromData(data);

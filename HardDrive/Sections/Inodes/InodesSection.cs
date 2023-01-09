@@ -9,14 +9,15 @@ namespace HardDrive
     [Serializable]
     public class InodesSection : HardDriveSection
     {
-        private int _bitmapSize;
+        private int _bitmapLength;
         public Inode[] Inodes { get; private set; }
 
-        public InodesSection(int size, IHardDrive hardDrive, int bitmapSize, bool initFromDrive = false) : base(size,
+        public InodesSection(int size, IHardDrive hardDrive, int bitmapLength, bool initFromDrive = false) : base(size,
             hardDrive,
             initFromDrive)
         {
-            _bitmapSize = bitmapSize;
+            _bitmapLength = bitmapLength;
+            Initialize();
         }
 
         public override int Length() => Inode.InodeLength * Size;
@@ -24,7 +25,7 @@ namespace HardDrive
         public int FreeInodesAmount() => Inodes.Count(inode => !inode.IsOccupied);
 
         public override byte[] ReadSection() =>
-            HardDrive.Read(Length(), _bitmapSize).BinaryCharsArrayToByteArray();
+            HardDrive.Read(Length(), _bitmapLength).BinaryCharsArrayToByteArray();
 
         public override void SaveSection()
         {
@@ -34,11 +35,11 @@ namespace HardDrive
                 sb.Append(node.GetBinaryStr());
             }
 
-            HardDrive.Write(sb.ToString(), _bitmapSize);
+            HardDrive.Write(sb.ToString(), _bitmapLength);
         }
 
         public void SaveInode(Inode inode) =>
-            HardDrive.Write(inode.GetBinaryStr(), _bitmapSize + inode.Id * Inode.InodeLength);
+            HardDrive.Write(inode.GetBinaryStr(), _bitmapLength + inode.Id * Inode.InodeLength);
 
         public Inode GetFreeInode() => Inodes.FirstOrDefault(elem => !elem.IsOccupied);
 

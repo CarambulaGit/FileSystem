@@ -6,7 +6,7 @@ using SerDes;
 
 namespace FileSystem
 {
-    class Program
+    public class Program
     {
         public static void Main(string[] args)
         {
@@ -18,7 +18,7 @@ namespace FileSystem
             fileSystem.Initialize();
         }
 
-        private static IServiceProvider SetupDI(string[] args,
+        public static IServiceProvider SetupDI(string[] args,
             (int inodesAmount, int dataBlocksAmount, bool initFromDrive) fileSystemConfiguration)
         {
             var host = Host.CreateDefaultBuilder(args)

@@ -67,12 +67,27 @@ namespace SerDesTests
         }
 
         [Test]
+        public void TestDataBlocksCapacity()
+        {
+            int prev = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                var binaryStr = new string('0', i).ToByteArray().ByteArrayToBinaryStr();
+                Console.WriteLine($"{i} === {binaryStr.Length} === {binaryStr.Length - prev}");
+                prev = binaryStr.Length;
+            }
+        }
+
+        [Test]
         public void TestBitmapSection()
         {
             var hardDrive = new HardDrive.HardDrive(_serDes, "test4.txt");
-            var section = new BitmapSection(1, hardDrive, false);
-            var section2 = new BitmapSection(1, hardDrive, true);
-            Assert.IsTrue(section.OccupiedMask.ContentsMatch(section2.OccupiedMask));
+            var size = 2;
+            var section = new BitmapSection(size, hardDrive, false);
+            section.OccupiedMask[0] = true;
+            section.SaveSection();
+            var section2 = new BitmapSection(size, hardDrive, true);
+            Assert.IsTrue(section.OccupiedMask.ContentsMatchOrdered(section2.OccupiedMask));
         }
 
         [Test]
@@ -97,9 +112,38 @@ namespace SerDesTests
             var bitmapSize = 0;
             var inodesSize = 0;
             var section = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, false);
-            section.WriteBlock(0, "TestDataBlocks");
+            section.WriteBlock(0, "TestDataBlocks".ToByteArray().ByteArrayToBinaryStr());
             var section2 = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, true);
-            Assert.IsTrue(section.ReadBlock(0).ContentsMatch(section2.ReadBlock(0)));
+            Assert.IsTrue(section.ReadBlock(0).ContentsMatchOrdered(section2.ReadBlock(0)));
+        }
+
+        [Test]
+        public void TestAllSection()
+        {
+            var hardDrive = new HardDrive.HardDrive(_serDes, "test7.txt");
+            var size = 2;
+            var bitmapSection = new BitmapSection(size, hardDrive, false);
+            bitmapSection.OccupiedMask[0] = true;
+            bitmapSection.SaveSection();
+
+            var bitmapLength = bitmapSection.Length();
+            var inodesSection = new InodesSection(1, hardDrive, bitmapLength, false);
+            inodesSection.Inodes[0].OccupiedDataBlocks = new BlockAddress[]
+            {
+                new BlockAddress(1),
+            };
+            inodesSection.SaveInode(inodesSection.Inodes[0]);
+
+            var inodesLength = inodesSection.Length();
+            var dataBlocksSection = new DataBlocksSection(1, hardDrive, bitmapLength, inodesLength, false);
+            dataBlocksSection.WriteBlock(0, "TestDataBlocks".ToByteArray().ByteArrayToBinaryStr());
+            
+            var bitmapSection1 = new BitmapSection(size, hardDrive, true);
+            Assert.IsTrue(bitmapSection.OccupiedMask.ContentsMatchOrdered(bitmapSection1.OccupiedMask));
+            var inodesSection1 = new InodesSection(1, hardDrive, bitmapLength, true);
+            Assert.IsTrue(inodesSection.Inodes.ContentsMatch(inodesSection1.Inodes));
+            var dataBlocksSection1 = new DataBlocksSection(1, hardDrive, bitmapLength, inodesLength, true);
+            Assert.IsTrue(dataBlocksSection.ReadBlock(0).ContentsMatchOrdered(dataBlocksSection1.ReadBlock(0)));
         }
     }
 }
