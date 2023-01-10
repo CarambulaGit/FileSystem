@@ -194,7 +194,6 @@ namespace FileSystem
         public RegularFile CreateFile(string name)
         {
             throw new NotImplementedException();
-            // CreationCallback();
             // todo
         }
 
@@ -301,6 +300,41 @@ namespace FileSystem
 
         #endregion
 
+        #region Other
+
+        public Inode GetInodeByPath(string path)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            if (absolutePath == RootDirectoryPath) return RootDirectory.Inode;
+
+            var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
+            Directory dir;
+            string pathToSavable;
+            if (indexOfLastSplitter == -1)
+            {
+                pathToSavable = RootDirectoryPath;
+                dir = RootDirectory;
+            }
+            else
+            {
+                pathToSavable = absolutePath[..indexOfLastSplitter];
+                if (!TryGetDirectoryInodeByPath(pathToSavable, out var parentInode,
+                        out dir, out var reason))
+                {
+                    throw new InvalidDirectoryPathException(reason);
+                }
+            }
+
+            var namesWithInodes = GetNamesWithInodes(dir);
+            var savableName = absolutePath[(indexOfLastSplitter + 1)..];
+            if (!namesWithInodes.TryGetValue(savableName, out var inode))
+            {
+                throw new CannotFindSavableException(pathToSavable, savableName);
+            }
+
+            return inode;
+        }
+
         private void DeleteFromParent(Inode savableInode, Inode parentInode)
         {
             var parentDir = ReadDirectory(parentInode);
@@ -313,32 +347,39 @@ namespace FileSystem
 
         private bool PathValid(string path, string name, out Inode parentInode, out string reason)
         {
-            reason = string.Empty;
-            parentInode = null;
-            var pathParts = path.Split(Path.AltDirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-            var currentDirectory = RootDirectory;
-            Dictionary<string, Inode> namesWithInodes;
-            for (int i = 0; i < pathParts.Length; i++)
-            {
-                namesWithInodes = GetNamesWithInodes(currentDirectory);
-                if (!namesWithInodes.TryGetValue(pathParts[i], out var inode))
-                {
-                    reason =
-                        $"Can't find folder with name = {pathParts[i]}, at path = {string.Join(Path.AltDirectorySeparatorChar, pathParts[..i])}";
-                    return false;
-                }
+            if (!TryGetDirectoryInodeByPath(path, out parentInode, out var currentDirectory, out reason)) return false;
 
-                currentDirectory = ReadDirectory(inode);
-            }
-
-            namesWithInodes = GetNamesWithInodes(currentDirectory);
+            var namesWithInodes = GetNamesWithInodes(currentDirectory);
             if (namesWithInodes.ContainsKey(name))
             {
                 reason = $"There is already savable with name = {name}, at path = {path}";
                 return false;
             }
 
-            parentInode = currentDirectory.Inode;
+            return true;
+        }
+
+        private bool TryGetDirectoryInodeByPath(string path, out Inode resultInode, out Directory dir,
+            out string reason)
+        {
+            reason = string.Empty;
+            resultInode = null;
+            var pathParts = path.Split(Path.AltDirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            dir = RootDirectory;
+            for (var i = 0; i < pathParts.Length; i++)
+            {
+                var namesWithInodes = GetNamesWithInodes(dir);
+                if (!namesWithInodes.TryGetValue(pathParts[i], out var inode) || inode.FileType != FileType.Directory)
+                {
+                    reason =
+                        $"Can't find directory with name = {pathParts[i]}, at path = {string.Join(Path.AltDirectorySeparatorChar, pathParts[..i])}";
+                    return false;
+                }
+
+                dir = ReadDirectory(inode);
+            }
+
+            resultInode = dir.Inode;
             return true;
         }
 
@@ -398,5 +439,7 @@ namespace FileSystem
                 RootDirectory = parentFolder;
             }
         }
+
+        #endregion
     }
 }

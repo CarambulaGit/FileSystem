@@ -24,5 +24,6 @@ namespace FileSystem
         RegularFile ReadFile(Inode inode);
         void SaveFile();
         void DeleteFile();
+        Inode GetInodeByPath(string path);
     }
 }
