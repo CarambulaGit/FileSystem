@@ -20,10 +20,11 @@ namespace FileSystem
         Directory ReadDirectory(Inode inode);
         void SaveDirectory(Directory directory);
         void DeleteDirectory(Directory directory);
-        RegularFile CreateFile(string name);
+        RegularFile CreateFile(string name, string path);
         RegularFile ReadFile(Inode inode);
-        void SaveFile();
-        void DeleteFile();
+        void SaveFile(RegularFile file);
+        void DeleteFile(RegularFile file);
         Inode GetInodeByPath(string path);
+        void DeleteFile(RegularFile file, string path);
     }
 }

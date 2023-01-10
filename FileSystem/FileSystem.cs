@@ -65,7 +65,7 @@ namespace FileSystem
         {
             RootDirectory = !_initFromDrive
                 ? CreateRootDirectory()
-                : ConstructDirectoryFromInode(InodesSection.Inodes[RootFolderInodeId]);
+                : ReadDirectory(InodesSection.Inodes[RootFolderInodeId]);
         }
 
         private Directory CreateRootDirectory()
@@ -91,21 +91,10 @@ namespace FileSystem
                 throw new InvalidDirectoryNameException();
             }
 
-            var absolutePath = _pathResolver.Resolve(path);
-            if (!PathValid(absolutePath, name, out var parentFolderInode, out var reason))
-            {
-                throw new InvalidDirectoryPathException(reason);
-            }
-
-            var freeInode = GetFreeInode();
-            var parentFolder = ReadDirectory(parentFolderInode);
-            var dirContent = parentFolder.GetContent();
-            dirContent.ChildrenInodeIds.Add(freeInode.Id);
-            parentFolder.Content = dirContent.ToByteArray();
-            SaveDirectory(parentFolder);
+            var parentFolder = GetParentOfNewSavable(name, path, out var freeInode);
             parentFolder.Inode.LinksCount++;
             InodesSection.SaveInode(parentFolder.Inode);
-            var newFolder = new Directory(freeInode, parentFolderInode.Id);
+            var newFolder = new Directory(freeInode, parentFolder.Inode.Id);
             freeInode.LinksCount = newFolder.LinksCountDefault();
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.Directory;
@@ -116,6 +105,12 @@ namespace FileSystem
 
         public Directory ReadDirectory(Inode inode)
         {
+            var desiredType = FileType.Directory;
+            if (inode.FileType != desiredType)
+            {
+                throw new IncorrectInodeTypeException(inode, desiredType);
+            }
+
             var blocksContent = GetDataBlocksContent(inode);
             var directory = new Directory(inode)
             {
@@ -124,31 +119,7 @@ namespace FileSystem
             return directory;
         }
 
-        public void SaveDirectory(Directory directory)
-        {
-            var occupiedBlocks = directory.Inode.OccupiedDataBlocks;
-            var splitData = SplitForDataBlocks(directory.Content.ByteArrayToBinaryStr()).ToArray();
-            if (occupiedBlocks.Length > splitData.Length)
-            {
-                directory.Inode.OccupiedDataBlocks = occupiedBlocks[..splitData.Length];
-            }
-
-            if (occupiedBlocks.Length < splitData.Length)
-            {
-                var additionalBlocksAmount = splitData.Length - occupiedBlocks.Length;
-                _ = GetFreeDataBlocks(additionalBlocksAmount, out var indexes);
-                BitmapSection.SetOccupied(indexes);
-                var blockAddresses = indexes.Select(index => new BlockAddress(index));
-                directory.Inode.OccupiedDataBlocks = occupiedBlocks.Concat(blockAddresses).ToArray();
-            }
-
-            InodesSection.SaveInode(directory.Inode);
-            occupiedBlocks = directory.Inode.OccupiedDataBlocks;
-            for (var i = 0; i < splitData.Length; i++)
-            {
-                DataBlocksSection.WriteBlock(occupiedBlocks[i].Address, splitData[i]);
-            }
-        }
+        public void SaveDirectory(Directory directory) => SaveSavable(directory);
 
         #region Delete
 
@@ -168,9 +139,7 @@ namespace FileSystem
 
             DeleteFolderFromParent(directory, dirContent, dirInode);
 
-            BitmapSection.Release(dirInode.OccupiedDataBlocks.Select(block => block.Address).ToArray());
-            dirInode.Clear();
-            InodesSection.SaveInode(dirInode);
+            DeleteSavable(dirInode);
         }
 
         private void DeleteFolderFromParent(Directory directory, Directory.DirectoryContent dirContent, Inode dirInode)
@@ -191,30 +160,55 @@ namespace FileSystem
 
         #region File
 
-        public RegularFile CreateFile(string name)
+        public RegularFile CreateFile(string name, string path)
         {
-            throw new NotImplementedException();
-            // todo
+            if (!FileNameValid(name))
+            {
+                throw new InvalidFileNameException();
+            }
+
+            var parentFolder = GetParentOfNewSavable(name, path, out var freeInode);
+            var file = new RegularFile(freeInode);
+            freeInode.LinksCount = file.LinksCountDefault();
+            freeInode.FileNames.Add(name);
+            freeInode.FileType = FileType.RegularFile;
+            SaveFile(file);
+            FolderChildChangeCallback(parentFolder);
+            return file;
         }
 
         public RegularFile ReadFile(Inode inode)
         {
+            var desiredType = FileType.RegularFile;
+            if (inode.FileType != desiredType)
+            {
+                throw new IncorrectInodeTypeException(inode, desiredType);
+            }
+
             var blocksContent = GetDataBlocksContent(inode);
-            var file = new RegularFile(inode)
+            var file = new RegularFile(inode, false)
             {
                 Content = blocksContent
             };
             return file;
         }
 
-        public void SaveFile()
+        public void SaveFile(RegularFile file) => SaveSavable(file);
+
+        public void DeleteFile(RegularFile file)
         {
-            // todo
+            var fileInode = file.Inode;
+            var parentInode = GetParentByInode(fileInode);
+            DeleteFromParent(fileInode, parentInode);
+            DeleteSavable(fileInode);
         }
 
-        public void DeleteFile()
+        public void DeleteFile(RegularFile file, string path)
         {
-            // todo
+            var fileInode = file.Inode;
+            var parentInode = GetInodeByPath(path);
+            DeleteFromParent(fileInode, parentInode);
+            DeleteSavable(fileInode);
         }
 
         private bool FileNameValid(string name) => true; // todo
@@ -265,28 +259,6 @@ namespace FileSystem
 
         #region SavableConstructors
 
-        private Directory ConstructDirectoryFromInode(Inode inode)
-        {
-            var desiredType = FileType.Directory;
-            if (inode.FileType != desiredType)
-            {
-                throw new IncorrectInodeTypeException(inode, desiredType);
-            }
-
-            return ReadDirectory(inode);
-        }
-
-        private RegularFile ConstructRegularFileFromInode(Inode inode)
-        {
-            var desiredType = FileType.RegularFile;
-            if (inode.FileType != desiredType)
-            {
-                throw new IncorrectInodeTypeException(inode, desiredType);
-            }
-
-            return ReadFile(inode);
-        }
-
         private Symlink ConstructSymlinkFromInode(Inode inode)
         {
             var desiredType = FileType.Symlink;
@@ -321,7 +293,7 @@ namespace FileSystem
                 if (!TryGetDirectoryInodeByPath(pathToSavable, out var parentInode,
                         out dir, out var reason))
                 {
-                    throw new InvalidDirectoryPathException(reason);
+                    throw new InvalidSavablePathException(reason);
                 }
             }
 
@@ -333,6 +305,56 @@ namespace FileSystem
             }
 
             return inode;
+        }
+
+        private void DeleteSavable(Inode savableInode)
+        {
+            BitmapSection.Release(savableInode.OccupiedDataBlocks.Select(block => block.Address).ToArray());
+            savableInode.Clear();
+            InodesSection.SaveInode(savableInode);
+        }
+
+        private void SaveSavable(BaseSavable savable)
+        {
+            var occupiedBlocks = savable.Inode.OccupiedDataBlocks;
+            var splitData = SplitForDataBlocks(savable.Content.ByteArrayToBinaryStr()).ToArray();
+            if (occupiedBlocks.Length > splitData.Length)
+            {
+                savable.Inode.OccupiedDataBlocks = occupiedBlocks[..splitData.Length];
+            }
+
+            if (occupiedBlocks.Length < splitData.Length)
+            {
+                var additionalBlocksAmount = splitData.Length - occupiedBlocks.Length;
+                _ = GetFreeDataBlocks(additionalBlocksAmount, out var indexes);
+                BitmapSection.SetOccupied(indexes);
+                var blockAddresses = indexes.Select(index => new BlockAddress(index));
+                savable.Inode.OccupiedDataBlocks = occupiedBlocks.Concat(blockAddresses).ToArray();
+            }
+
+            InodesSection.SaveInode(savable.Inode);
+            occupiedBlocks = savable.Inode.OccupiedDataBlocks;
+            for (var i = 0; i < splitData.Length; i++)
+            {
+                DataBlocksSection.WriteBlock(occupiedBlocks[i].Address, splitData[i]);
+            }
+        }
+
+        private Directory GetParentOfNewSavable(string name, string path, out Inode freeInode)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            if (!PathValid(absolutePath, name, out var parentFolderInode, out var reason))
+            {
+                throw new InvalidSavablePathException(reason);
+            }
+
+            freeInode = GetFreeInode();
+            var parentFolder = ReadDirectory(parentFolderInode);
+            var dirContent = parentFolder.GetContent();
+            dirContent.ChildrenInodeIds.Add(freeInode.Id);
+            parentFolder.Content = dirContent.ToByteArray();
+            SaveDirectory(parentFolder);
+            return parentFolder;
         }
 
         private void DeleteFromParent(Inode savableInode, Inode parentInode)
@@ -385,22 +407,60 @@ namespace FileSystem
 
         private Dictionary<string, Inode> GetNamesWithInodes(Directory directory)
         {
+            var childrenInodes = GetChildrenInodes(directory);
+            var namesWithInodes = childrenInodes
+                .SelectMany(inodes => inodes.FileNames, (inode, fileName) => (fileName, inode))
+                .ToDictionary(tuple => tuple.fileName, tuple => tuple.inode);
+            return namesWithInodes;
+        }
+
+        private List<Inode> GetChildrenInodes(Directory directory)
+        {
             var rawChildrenIds = directory.GetContent().ChildrenInodeIds;
-            Dictionary<string, Inode> namesWithInodes;
-            if (rawChildrenIds.Count > 2)
+            var startIndex = Directory.DirectoryContent.DefaultNumOfChildren;
+            List<Inode> childrenInodes = null;
+            if (rawChildrenIds.Count > startIndex)
             {
-                var childrenIds = rawChildrenIds.GetRangeByStartIndex(2);
-                var childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
-                namesWithInodes = childrenInodes
-                    .SelectMany(inodes => inodes.FileNames, (inode, fileName) => (fileName, inode))
-                    .ToDictionary(tuple => tuple.fileName, tuple => tuple.inode);
-            }
-            else
-            {
-                namesWithInodes = new Dictionary<string, Inode>();
+                var childrenIds = rawChildrenIds.GetRangeByStartIndex(startIndex);
+                childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
             }
 
-            return namesWithInodes;
+            return childrenInodes ?? new List<Inode>();
+        }
+
+        private Inode GetParentByInode(Inode inode)
+        {
+            if (!inode.IsOccupied)
+            {
+                throw new EmptyInodeCannotHaveParentException();
+            }
+
+            if (inode.Id == RootDirectory.Inode.Id)
+            {
+                throw new RootDirectoryDoesNotHaveParentException();
+            }
+
+            var directoriesQuery = new Queue<Directory>();
+            directoriesQuery.Enqueue(RootDirectory);
+            while (directoriesQuery.Count > 0)
+            {
+                var curDir = directoriesQuery.Dequeue();
+                var children = GetChildrenInodes(curDir);
+                foreach (var child in children)
+                {
+                    if (child.FileNames.Any(name => inode.FileNames.Contains(name)))
+                    {
+                        return curDir.Inode;
+                    }
+
+                    if (child.FileType == FileType.Directory)
+                    {
+                        directoriesQuery.Enqueue(ReadDirectory(child));
+                    }
+                }
+            }
+
+            throw new CannotFindParentByInodeException(inode);
         }
 
         private byte[] GetDataBlocksContent(Inode inode)

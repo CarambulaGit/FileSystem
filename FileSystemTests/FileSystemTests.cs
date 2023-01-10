@@ -2,9 +2,11 @@
 using System.IO;
 using System.Linq;
 using FileSystem;
+using FileSystem.Savable;
 using HardDrive;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using SerDes;
 
 namespace PathResolverTests
 {
@@ -36,13 +38,14 @@ namespace PathResolverTests
         public void CreateFolderTest()
         {
             var name = "Andrew loh";
+            var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
             var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootPath);
             var root = _fileSystem.ReadDirectory(
                 _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
             Assert.AreEqual(_fileSystem.RootDirectory.GetContent(), root.GetContent());
-            Assert.IsTrue(_fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count == 3);
+            Assert.IsTrue(_fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count == oldNumOfChildren + 1);
             Assert.AreEqual(dir.GetContent(),
-                _fileSystem.ReadDirectory(_fileSystem.InodesSection.Inodes[1]).GetContent());
+                _fileSystem.ReadDirectory(_fileSystem.InodesSection.Inodes[dir.Inode.Id]).GetContent());
         }
 
         [Test]
@@ -51,7 +54,7 @@ namespace PathResolverTests
             var name = "Andrew loh";
             var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootPath);
             var numOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
-            var folderInode = _fileSystem.InodesSection.Inodes.First(inode => inode.FileNames.Contains(name));
+            var folderInode = dir.Inode;
             _fileSystem.DeleteDirectory(_fileSystem.ReadDirectory(folderInode));
             var root = _fileSystem.ReadDirectory(
                 _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
@@ -72,6 +75,42 @@ namespace PathResolverTests
             Assert.AreEqual(root.Inode, _fileSystem.GetInodeByPath(Path.AltDirectorySeparatorChar.ToString()));
             Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath($"{_fileSystem.RootDirectoryPath}{fileName}"));
             Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath(fileName));
+        }
+
+        [Test]
+        public void CreateRegularFileTest()
+        {
+            var name = "Andrew loh";
+            var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
+            var file = _fileSystem.CreateFile(name, _fileSystem.RootPath);
+            var fileContent = file.GetContent();
+            fileContent.Text = name;
+            file.Content = fileContent.ToByteArray();
+            _fileSystem.SaveFile(file);
+            var root = _fileSystem.ReadDirectory(
+                _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
+            Assert.AreEqual(_fileSystem.RootDirectory.GetContent(), root.GetContent());
+            Assert.IsTrue(_fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count == oldNumOfChildren + 1);
+            Assert.AreEqual(file.GetContent(),
+                _fileSystem.ReadFile(_fileSystem.InodesSection.Inodes[file.Inode.Id]).GetContent());
+        }
+
+        [Test]
+        public void DeleteRegularFileTest()
+        {
+            var name = "Andrew loh";
+            var file = _fileSystem.CreateFile(name, _fileSystem.RootPath);
+            var fileInode = file.Inode;
+            var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
+            _fileSystem.DeleteFile(_fileSystem.ReadFile(fileInode));
+            var root = _fileSystem.ReadDirectory(
+                _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
+
+            Assert.AreEqual(_fileSystem.RootDirectory.GetContent(), root.GetContent());
+            Assert.IsTrue(_fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count == oldNumOfChildren - 1);
+            Assert.IsTrue(!fileInode.IsOccupied && fileInode.FileNames.Count == 0 &&
+                          fileInode.OccupiedDataBlocks.Length == 0 && fileInode.LinksCount == 0 &&
+                          fileInode.FileType == FileType.None);
         }
     }
 }

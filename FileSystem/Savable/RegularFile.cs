@@ -11,10 +11,19 @@ namespace FileSystem.Savable
         [Serializable]
         public struct RegularFileContent
         {
-            public string Text { get; private set; }
+            public string Text { get; set; }
         }
 
-        public RegularFile(Inode inode) : base(inode) { }
+        public RegularFile(Inode inode, bool fillContentWithDefaultValue = true) : base(inode)
+        {
+            if (!fillContentWithDefaultValue) return;
+            var content = new RegularFileContent()
+            {
+                Text = string.Empty
+            };
+
+            Content = content.ToByteArray();
+        }
 
         public override int LinksCountDefault() => DefaultLinksCount;
 
