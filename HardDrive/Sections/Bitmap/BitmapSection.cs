@@ -34,16 +34,20 @@ namespace HardDrive
         public int[] GetFreeBlocksIndexes(int amount) =>
             OccupiedMask.FirstNIndexes(amount, elem => elem == false).ToArray();
 
-        public void SetOccupied(IEnumerable<int> indexes)
-        {
-            foreach (var index in indexes)
-            {
-                OccupiedMask[index] = true;
-            }
-        }
+        public void SetOccupied(params int[] indexes) => ChangeBitsState(indexes, true);
+
+        public void Release(params int[] indexes) => ChangeBitsState(indexes, false);
 
         protected override void InitData() => OccupiedMask = new bool[Size];
 
         protected override void InitFromData(byte[] data) => OccupiedMask = data.To<bool[]>();
+
+        private void ChangeBitsState(IEnumerable<int> indexes, bool newState)
+        {
+            foreach (var index in indexes)
+            {
+                OccupiedMask[index] = newState;
+            }
+        }
     }
 }

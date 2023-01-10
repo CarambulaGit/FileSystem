@@ -19,7 +19,7 @@ namespace FileSystem
         Directory CreateDirectory(string name, string path);
         Directory ReadDirectory(Inode inode);
         void SaveDirectory(Directory directory);
-        void DeleteDirectory();
+        void DeleteDirectory(Directory directory);
         RegularFile CreateFile(string name);
         RegularFile ReadFile(Inode inode);
         void SaveFile();

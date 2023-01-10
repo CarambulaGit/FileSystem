@@ -14,6 +14,7 @@ namespace FileSystem.Savable
         [Serializable]
         public struct DirectoryContent
         {
+            public const int DefaultNumOfChildren = 2;
             [NotNull] public List<int> ChildrenInodeIds { get; set; }
 
             public override bool Equals(object obj)
@@ -47,10 +48,8 @@ namespace FileSystem.Savable
 
         public override DirectoryContent GetContent() => Content.To<DirectoryContent>();
 
-        public int GetParentDirectoryInodeId()
-        {
-            var content = GetContent();
-            return content.ChildrenInodeIds[0];
-        }
+        public int GetParentDirectoryInodeId() => GetParentDirectoryInodeId(GetContent());
+
+        public int GetParentDirectoryInodeId(DirectoryContent directoryContent) => directoryContent.ChildrenInodeIds[0];
     }
 }

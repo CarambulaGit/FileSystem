@@ -21,6 +21,14 @@ namespace HardDrive
 
         public string GetBinaryStr() => this.ToByteArray().ByteArrayToBinaryStr().PadRight(InodeLength, '0');
 
+        public void Clear()
+        {
+            FileNames.Clear();
+            FileType = FileType.None;
+            LinksCount = 0;
+            OccupiedDataBlocks = Array.Empty<BlockAddress>();
+        }
+
         public override bool Equals(object obj)
         {
             if (obj is not Inode item)

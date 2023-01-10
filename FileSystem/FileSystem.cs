@@ -110,7 +110,7 @@ namespace FileSystem
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.Directory;
             SaveDirectory(newFolder);
-            CreationCallback(parentFolder);
+            FolderChildChangeCallback(parentFolder);
             return newFolder;
         }
 
@@ -150,10 +150,40 @@ namespace FileSystem
             }
         }
 
-        public void DeleteDirectory()
+        #region Delete
+
+        public void DeleteDirectory(Directory directory)
         {
-            // todo
+            var dirInode = directory.Inode;
+            if (dirInode.Id == RootDirectory.Inode.Id)
+            {
+                throw new CannotDeleteRootDirectory();
+            }
+
+            var dirContent = directory.GetContent();
+            if (dirContent.ChildrenInodeIds.Count > Directory.DirectoryContent.DefaultNumOfChildren)
+            {
+                throw new DirectoryHasChildrenException();
+            }
+
+            DeleteFolderFromParent(directory, dirContent, dirInode);
+
+            BitmapSection.Release(dirInode.OccupiedDataBlocks.Select(block => block.Address).ToArray());
+            dirInode.Clear();
+            InodesSection.SaveInode(dirInode);
         }
+
+        private void DeleteFolderFromParent(Directory directory, Directory.DirectoryContent dirContent, Inode dirInode)
+        {
+            var parentDirNodeId = directory.GetParentDirectoryInodeId(dirContent);
+            var parentInode = InodesSection.Inodes[parentDirNodeId];
+            parentInode.LinksCount--;
+            InodesSection.SaveInode(parentInode);
+
+            DeleteFromParent(dirInode, parentInode);
+        }
+
+        #endregion
 
         private bool FolderNameValid(string name) => true; // todo
 
@@ -271,6 +301,16 @@ namespace FileSystem
 
         #endregion
 
+        private void DeleteFromParent(Inode savableInode, Inode parentInode)
+        {
+            var parentDir = ReadDirectory(parentInode);
+            var parentDirContent = parentDir.GetContent();
+            parentDirContent.ChildrenInodeIds.Remove(savableInode.Id);
+            parentDir.Content = parentDirContent.ToByteArray();
+            SaveDirectory(parentDir);
+            FolderChildChangeCallback(parentDir);
+        }
+
         private bool PathValid(string path, string name, out Inode parentInode, out string reason)
         {
             reason = string.Empty;
@@ -350,8 +390,8 @@ namespace FileSystem
 
             return result;
         }
-        
-        private void CreationCallback(Directory parentFolder)
+
+        private void FolderChildChangeCallback(Directory parentFolder)
         {
             if (parentFolder.Inode.Id == RootFolderInodeId)
             {
