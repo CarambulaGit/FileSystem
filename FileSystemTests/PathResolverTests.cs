@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using FileSystem;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -34,8 +35,15 @@ namespace PathResolverTests
         [TestCase("/bad/../guy/../..", "")]
         public void RemoveDoubleDotsTest(string path, string result)
         {
-            // _pathResolver.RemoveDoubleDots(ref path);
-            Assert.AreEqual(result, path);
+            var removeDoubleDotsMethodInfo = typeof(PathResolver)
+                .GetMethod(
+                    "RemoveDoubleDots",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] args = new [] { path };
+            removeDoubleDotsMethodInfo
+                .Invoke(_pathResolver, args);
+
+            Assert.AreEqual(result, args[0]);
         }
     }
 }
