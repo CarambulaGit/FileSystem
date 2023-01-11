@@ -27,5 +27,6 @@ namespace FileSystem
         Inode GetInodeByPath(string path, out Inode parentInode);
         void DeleteFile(string path);
         void ChangeCurrentDirectory(string path);
+        void DeleteDirectory(string path);
     }
 }

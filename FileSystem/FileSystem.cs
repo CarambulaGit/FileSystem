@@ -124,6 +124,17 @@ namespace FileSystem
 
         #region Delete
 
+        public void DeleteDirectory(string path)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            if (!TryGetDirectoryInodeByPath(absolutePath, out var inode, out var dir, out var reason))
+            {
+                throw new InvalidSavablePathException(reason);
+            }
+            
+            DeleteDirectory(dir);
+        }
+
         public void DeleteDirectory(Directory directory)
         {
             var dirInode = directory.Inode;
@@ -414,11 +425,17 @@ namespace FileSystem
             for (var i = 0; i < pathParts.Length; i++)
             {
                 var namesWithInodes = GetNamesWithInodes(dir);
-                if (!namesWithInodes.TryGetValue(pathParts[i], out var inode) || inode.FileType != FileType.Directory)
+                if (!namesWithInodes.TryGetValue(pathParts[i], out var inode) ||
+                    (inode.FileType != FileType.Symlink && inode.FileType != FileType.Directory))
                 {
                     reason =
                         $"Can't find directory with name = {pathParts[i]}, at path = {string.Join(Path.AltDirectorySeparatorChar, pathParts[..i])}";
                     return false;
+                }
+
+                if (inode.FileType == FileType.Symlink)
+                {
+                    throw new NotImplementedException();
                 }
 
                 dir = ReadDirectory(inode);
