@@ -25,6 +25,7 @@ namespace FileSystem
 
         private readonly Lazy<IFileSystem> _fileSystem;
         private IFileSystem FileSystem => _fileSystem.Value;
+        public char Separator => Path.AltDirectorySeparatorChar;
         public string ParentDirectory => "..";
 
         public string CurrentDirectory => ".";
@@ -37,7 +38,7 @@ namespace FileSystem
         public string Resolve(string path) =>
             ResolveAbsolutePath(IsPathAbsolute(path)
                 ? path
-                : $"{GetWorkingDirectoryPath()}{Path.AltDirectorySeparatorChar}{path}"
+                : $"{GetWorkingDirectoryPath()}{Separator}{path}"
             );
 
         public string Resolve(Directory directory)
@@ -60,7 +61,7 @@ namespace FileSystem
 
             pathParts.Add(FileSystem.RootName);
             pathParts.Reverse();
-            return string.Join(Path.AltDirectorySeparatorChar, pathParts);
+            return string.Join(Separator, pathParts);
         }
 
         public (string pathToSavable, string savableName) SplitPath(string absolutePath)
@@ -70,11 +71,13 @@ namespace FileSystem
                 throw new PathMustBeAbsoluteException(absolutePath);
             }
 
-            var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
+            var indexOfLastSplitter = absolutePath.LastIndexOf(Separator);
             var splitResult = absolutePath.SplitByIndex(indexOfLastSplitter);
-            splitResult = ($"{Path.AltDirectorySeparatorChar}{splitResult.first}", splitResult.second);
+            splitResult = ($"{Separator}{splitResult.first}", splitResult.second);
             return splitResult;
         }
+
+        public string Combine(params string[] paths) => string.Join(Separator, paths);
 
         private bool IsPathAbsolute(string path) => path.StartsWith(FileSystem.RootDirectoryPath);
 
@@ -116,6 +119,8 @@ namespace FileSystem
         string Resolve(Directory directory);
         string ParentDirectory { get; }
         string CurrentDirectory { get; }
+        char Separator { get; }
         (string pathToSavable, string savableName) SplitPath(string absolutePath);
+        string Combine(params string[] paths);
     }
 }

@@ -30,5 +30,6 @@ namespace FileSystem
         void DeleteDirectory(string path);
         RegularFile ReadFile(string path);
         Directory ReadDirectory(string path);
+        void LinkFile(string pathToFile, string pathToCreatedLink);
     }
 }

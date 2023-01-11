@@ -27,7 +27,7 @@ namespace FileSystem
 
         #region Properties
 
-        public string RootDirectoryPath => RootName + Path.AltDirectorySeparatorChar;
+        public string RootDirectoryPath => RootName + _pathResolver.Separator;
         public string RootName => "";
         public Directory CurrentDirectory => CWDData.directory;
         public string CurrentDirectoryPath => CWDData.path;
@@ -260,11 +260,16 @@ namespace FileSystem
 
         public void LinkFile(string pathToFile, string pathToCreatedLink)
         {
-            ReadFile(pathToFile);
-            var splitPath = _pathResolver.SplitPath(pathToCreatedLink);
-            CheckPath(splitPath.savableName, pathToFile, out var parentFolderInode);
+            var file = ReadFile(pathToFile);
+            var absolutePathToCreatedLink = pathToCreatedLink;
+            var splitPath = _pathResolver.SplitPath(absolutePathToCreatedLink);
+            CheckPath(splitPath.savableName, splitPath.pathToSavable, out var parentFolderInode);
             var linkParentDir = ReadDirectory(parentFolderInode);
-            // linkParentDir.
+            var fileInode = file.Inode;
+            AddChildToDirectory(fileInode, linkParentDir);
+            fileInode.FileNames.Add(splitPath.savableName);
+            fileInode.LinksCount++;
+            InodesSection.SaveInode(fileInode);
         }
 
         private bool FileNameValid(string name) => true; // todo
@@ -454,7 +459,7 @@ namespace FileSystem
         {
             reason = string.Empty;
             resultInode = null;
-            var pathParts = path.Split(Path.AltDirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            var pathParts = path.Split(_pathResolver.Separator, StringSplitOptions.RemoveEmptyEntries);
             dir = RootDirectory;
             for (var i = 0; i < pathParts.Length; i++)
             {
@@ -463,7 +468,7 @@ namespace FileSystem
                     (inode.FileType != FileType.Symlink && inode.FileType != FileType.Directory))
                 {
                     reason =
-                        $"Can't find directory with name = {pathParts[i]}, at path = {string.Join(Path.AltDirectorySeparatorChar, pathParts[..i])}";
+                        $"Can't find directory with name = {pathParts[i]}, at path = {_pathResolver.Combine(pathParts[..i])}";
                     return false;
                 }
 

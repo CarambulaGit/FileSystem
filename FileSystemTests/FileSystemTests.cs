@@ -37,7 +37,7 @@ namespace PathResolverTests
         {
             var name = "Andrew loh";
             var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
-            var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootName);
+            var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootDirectoryPath);
             var root = _fileSystem.ReadDirectory(
                 _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
             Assert.AreEqual(_fileSystem.RootDirectory.GetContent(), root.GetContent());
@@ -50,7 +50,7 @@ namespace PathResolverTests
         public void DeleteFolderTest()
         {
             var name = "Andrew loh";
-            var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootName);
+            var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootDirectoryPath);
             var numOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
             var folderInode = dir.Inode;
             _fileSystem.DeleteDirectory(_fileSystem.ReadDirectory(folderInode));
@@ -67,10 +67,10 @@ namespace PathResolverTests
         public void FindInodeTest()
         {
             var fileName = "Andrew loh";
-            var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootName);
+            var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             var root = _fileSystem.ReadDirectory(
                 _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
-            Assert.AreEqual(root.Inode, _fileSystem.GetInodeByPath(Path.AltDirectorySeparatorChar.ToString(), out _));
+            Assert.AreEqual(root.Inode, _fileSystem.GetInodeByPath(_fileSystem.RootDirectoryPath, out _));
             Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath($"{_fileSystem.RootDirectoryPath}{fileName}", out _));
             Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath(fileName, out _));
         }
@@ -80,7 +80,7 @@ namespace PathResolverTests
         {
             var name = "Andrew loh";
             var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
-            var file = _fileSystem.CreateFile(name, _fileSystem.RootName);
+            var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var fileContent = file.GetContent();
             fileContent.Text = name;
             file.Content = fileContent.ToByteArray();
@@ -97,7 +97,7 @@ namespace PathResolverTests
         public void DeleteRegularFileTest()
         {
             var name = "Andrew loh";
-            var file = _fileSystem.CreateFile(name, _fileSystem.RootName);
+            var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var fileInode = file.Inode;
             var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeIds.Count;
             _fileSystem.DeleteFile(_fileSystem.ReadFile(fileInode));
@@ -115,7 +115,7 @@ namespace PathResolverTests
         public void ChangeCurrentDirectoryTest1()
         {
             var fileName = "Andrew loh";
-            var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootName);
+            var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             _fileSystem.ChangeCurrentDirectory(fileName);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir.Inode.Id);
             _fileSystem.ChangeCurrentDirectory(_fileSystem.RootDirectoryPath);
@@ -126,7 +126,7 @@ namespace PathResolverTests
         public void ChangeCurrentDirectoryTest2()
         {
             var fileName = "Andrew loh";
-            var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootName);
+            var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             _fileSystem.ChangeCurrentDirectory(fileName);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir.Inode.Id);
             _fileSystem.ChangeCurrentDirectory(_pathResolver.ParentDirectory);
@@ -137,7 +137,7 @@ namespace PathResolverTests
         public void ChangeCurrentDirectoryTest3()
         {
             var fileName = "Andrew loh";
-            var dir1 = _fileSystem.CreateDirectory(fileName, _fileSystem.RootName);
+            var dir1 = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             _fileSystem.ChangeCurrentDirectory(fileName);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir1.Inode.Id);
             var dir2 = _fileSystem.CreateDirectory(fileName, _pathResolver.CurrentDirectory);
@@ -145,6 +145,54 @@ namespace PathResolverTests
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir2.Inode.Id);
             _fileSystem.ChangeCurrentDirectory(_fileSystem.RootDirectoryPath);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == _fileSystem.RootDirectory.Inode.Id);
+        }
+
+        [Test]
+        public void LinkFileTest()
+        {
+            var dirName = "Andrew loh";
+            var dir = _fileSystem.CreateDirectory(dirName, _fileSystem.RootDirectoryPath);
+            var fileName = "file";
+            var file = _fileSystem.CreateFile(fileName, _fileSystem.RootDirectoryPath);
+            var fileContent = file.GetContent();
+            fileContent.Text = dirName;
+            file.Content = fileContent.ToByteArray();
+            _fileSystem.SaveFile(file);
+            var root = _fileSystem.ReadDirectory(
+                _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
+            var hardlinkName = "hardlink";
+            _fileSystem.LinkFile(fileName,
+                _pathResolver.Combine(_fileSystem.RootName, dirName, hardlinkName));
+            Assert.IsTrue(file.Inode.FileNames.Count == 2);
+            Assert.IsTrue(file.Inode.LinksCount == 2);
+            Assert.IsTrue(file.Inode.FileNames.Contains(fileName));
+            Assert.IsTrue(file.Inode.FileNames.Contains(hardlinkName));
+            dir = _fileSystem.ReadDirectory(dir.Inode);
+            Assert.IsTrue(dir.GetContent().ChildrenInodeIds.Contains(file.Inode.Id));
+        }
+
+        [Test]
+        public void UnlinkFileTest()
+        {
+            var dirName = "Andrew loh";
+            var dir = _fileSystem.CreateDirectory(dirName, _fileSystem.RootDirectoryPath);
+            var fileName = "file";
+            var file = _fileSystem.CreateFile(fileName, _fileSystem.RootDirectoryPath);
+            var fileContent = file.GetContent();
+            fileContent.Text = dirName;
+            file.Content = fileContent.ToByteArray();
+            _fileSystem.SaveFile(file);
+            var root = _fileSystem.ReadDirectory(
+                _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
+            var hardlinkName = "hardlink";
+            var pathToCreatedLink = _pathResolver.Combine(_fileSystem.RootName, dirName, hardlinkName);
+            _fileSystem.LinkFile(fileName, pathToCreatedLink);
+            _fileSystem.DeleteFile(fileName);
+            Assert.IsTrue(file.Inode.FileNames.Count == 1);
+            Assert.IsTrue(file.Inode.LinksCount == 1);
+            Assert.IsTrue(file.Inode.FileNames.Contains(hardlinkName));
+            var hardlinkFile = _fileSystem.ReadFile(pathToCreatedLink);
+            Assert.IsTrue(hardlinkFile.Inode == file.Inode);
         }
     }
 }
