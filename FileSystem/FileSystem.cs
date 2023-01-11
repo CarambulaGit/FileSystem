@@ -92,14 +92,14 @@ namespace FileSystem
                 throw new InvalidDirectoryNameException();
             }
 
-            var parentFolder = GetParentOfNewSavable(name, path, out var freeInode);
-            parentFolder.Inode.LinksCount++;
-            InodesSection.SaveInode(parentFolder.Inode);
+            var parentFolder = GetParentOfNewSavable(name, path);
+            var freeInode = GetFreeInode();
             var newFolder = new Directory(freeInode, parentFolder.Inode.Id);
             freeInode.LinksCount = newFolder.LinksCountDefault();
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.Directory;
             SaveDirectory(newFolder);
+            AddChildToDirectory(freeInode, parentFolder);
             FolderChildChangeCallback(parentFolder);
             return newFolder;
         }
@@ -174,6 +174,17 @@ namespace FileSystem
 
         private bool FolderNameValid(string name) => true; // todo
 
+        private void AddChildToDirectory(Inode childInode, Directory directory)
+        {
+            var dirContent = directory.GetContent();
+            dirContent.ChildrenInodeIds.Add(childInode.Id);
+            directory.Content = dirContent.ToByteArray();
+            SaveDirectory(directory);
+            if (childInode.FileType != FileType.Directory) return;
+            directory.Inode.LinksCount++;
+            InodesSection.SaveInode(directory.Inode);
+        }
+
         #endregion
 
         #region File
@@ -185,12 +196,14 @@ namespace FileSystem
                 throw new InvalidFileNameException();
             }
 
-            var parentFolder = GetParentOfNewSavable(name, path, out var freeInode);
+            var parentFolder = GetParentOfNewSavable(name, path);
+            var freeInode = GetFreeInode();
             var file = new RegularFile(freeInode);
             freeInode.LinksCount = file.LinksCountDefault();
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.RegularFile;
             SaveFile(file);
+            AddChildToDirectory(freeInode, parentFolder);
             FolderChildChangeCallback(parentFolder);
             return file;
         }
@@ -245,7 +258,14 @@ namespace FileSystem
             }
         }
 
-        public void LinkFile(string pathToFile, string pathToCreatedLink) { }
+        public void LinkFile(string pathToFile, string pathToCreatedLink)
+        {
+            ReadFile(pathToFile);
+            var splitPath = _pathResolver.SplitPath(pathToCreatedLink);
+            CheckPath(splitPath.savableName, pathToFile, out var parentFolderInode);
+            var linkParentDir = ReadDirectory(parentFolderInode);
+            // linkParentDir.
+        }
 
         private bool FileNameValid(string name) => true; // todo
 
@@ -389,21 +409,20 @@ namespace FileSystem
             }
         }
 
-        private Directory GetParentOfNewSavable(string name, string path, out Inode freeInode)
+        private Directory GetParentOfNewSavable(string name, string path)
         {
             var absolutePath = _pathResolver.Resolve(path);
-            if (!PathValid(absolutePath, name, out var parentFolderInode, out var reason))
+            CheckPath(name, absolutePath, out var parentFolderInode);
+            var parentFolder = ReadDirectory(parentFolderInode);
+            return parentFolder;
+        }
+
+        private void CheckPath(string name, string path, out Inode parentFolderInode)
+        {
+            if (!PathValid(path, name, out parentFolderInode, out var reason))
             {
                 throw new InvalidSavablePathException(reason);
             }
-
-            freeInode = GetFreeInode();
-            var parentFolder = ReadDirectory(parentFolderInode);
-            var dirContent = parentFolder.GetContent();
-            dirContent.ChildrenInodeIds.Add(freeInode.Id);
-            parentFolder.Content = dirContent.ToByteArray();
-            SaveDirectory(parentFolder);
-            return parentFolder;
         }
 
         private void DeleteFromParent(Inode savableInode, Inode parentInode)
@@ -513,7 +532,7 @@ namespace FileSystem
                 {
                     if (child.Id == inode.Id)
                     {
-                        result.Add(child);
+                        result.Add(curDir.Inode);
                     }
 
                     if (child.FileType == FileType.Directory)
@@ -523,7 +542,7 @@ namespace FileSystem
                 }
             }
 
-            throw new CannotFindParentByInodeException(inode);
+            return result.Count > 0 ? result : throw new CannotFindParentByInodeException(inode);
         }
 
         private byte[] GetDataBlocksContent(Inode inode)
