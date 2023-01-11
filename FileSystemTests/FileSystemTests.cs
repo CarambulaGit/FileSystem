@@ -70,9 +70,9 @@ namespace PathResolverTests
             var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootName);
             var root = _fileSystem.ReadDirectory(
                 _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
-            Assert.AreEqual(root.Inode, _fileSystem.GetInodeByPath(Path.AltDirectorySeparatorChar.ToString()));
-            Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath($"{_fileSystem.RootDirectoryPath}{fileName}"));
-            Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath(fileName));
+            Assert.AreEqual(root.Inode, _fileSystem.GetInodeByPath(Path.AltDirectorySeparatorChar.ToString(), out _));
+            Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath($"{_fileSystem.RootDirectoryPath}{fileName}", out _));
+            Assert.AreEqual(dir.Inode, _fileSystem.GetInodeByPath(fileName, out _));
         }
 
         [Test]

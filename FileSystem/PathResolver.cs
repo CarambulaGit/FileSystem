@@ -26,6 +26,7 @@ namespace FileSystem
         private readonly Lazy<IFileSystem> _fileSystem;
         private IFileSystem FileSystem => _fileSystem.Value;
         public string ParentDirectory => "..";
+
         public string CurrentDirectory => ".";
 
         public PathResolver(Lazy<IFileSystem> fileSystem)
@@ -48,7 +49,7 @@ namespace FileSystem
                 return FileSystem.RootName;
             }
 
-            var pathParts = new List<string> { directory.Inode.FileNames[0]};
+            var pathParts = new List<string> {directory.Inode.FileNames[0]};
             var curParentInode = GetInodeById(directory.GetParentDirectoryInodeId());
             while (curParentInode.Id != FileSystem.RootDirectory.Inode.Id)
             {
@@ -62,7 +63,18 @@ namespace FileSystem
             return string.Join(Path.AltDirectorySeparatorChar, pathParts);
         }
 
-        public bool IsPathAbsolute(string path) => path.StartsWith(FileSystem.RootDirectoryPath);
+        public (string pathToSavable, string savableName) SplitPath(string absolutePath)
+        {
+            if (IsPathAbsolute(absolutePath))
+            {
+                throw new PathMustBeAbsoluteException(absolutePath);
+            }
+
+            var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
+            return absolutePath.SplitByIndex(indexOfLastSplitter);
+        }
+
+        private bool IsPathAbsolute(string path) => path.StartsWith(FileSystem.RootDirectoryPath);
 
         private string ResolveAbsolutePath(string path)
         {
@@ -102,5 +114,6 @@ namespace FileSystem
         string Resolve(Directory directory);
         string ParentDirectory { get; }
         string CurrentDirectory { get; }
+        (string pathToSavable, string savableName) SplitPath(string absolutePath);
     }
 }

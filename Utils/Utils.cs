@@ -118,5 +118,18 @@ namespace Utils
 
         public static List<T> GetRangeByStartIndex<T>(this List<T> list, int startIndex) =>
             list.GetRange(startIndex, list.Count - startIndex);
+
+        public static (string first, string second) SplitByIndex(this string str, int index,
+            bool saveCharAtIndex = false)
+        {
+            var second = str[index..];
+            if (saveCharAtIndex)
+            {
+                return (str[..(index + 1)], second);
+            }
+
+            second = second.Remove(0);
+            return (str[..index], second);
+        }
     }
 }

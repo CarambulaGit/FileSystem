@@ -199,17 +199,27 @@ namespace FileSystem
         public void DeleteFile(RegularFile file)
         {
             var fileInode = file.Inode;
-            var parentInode = GetParentByInode(fileInode);
-            DeleteFromParent(fileInode, parentInode);
+            var parentsInodes = GetParentsByInode(fileInode);
+            parentsInodes.ForEach(parentInode => DeleteFromParent(fileInode, parentInode));
             DeleteSavable(fileInode);
         }
 
-        public void DeleteFile(RegularFile file, string path)
+        public void DeleteFile(string path)
         {
-            var fileInode = file.Inode;
-            var parentInode = GetInodeByPath(path);
-            DeleteFromParent(fileInode, parentInode);
-            DeleteSavable(fileInode);
+            var absolutePath = _pathResolver.Resolve(path);
+            var inode = GetInodeByPath(absolutePath, out var parentInode);
+            DeleteFromParent(inode, parentInode);
+            var splitPath = _pathResolver.SplitPath(absolutePath);
+            inode.FileNames.Remove(splitPath.savableName);
+            inode.LinksCount--;
+            if (!inode.IsOccupied)
+            {
+                DeleteSavable(inode);
+            }
+            else
+            {
+                InodesSection.SaveInode(inode);
+            }
         }
 
         private bool FileNameValid(string name) => true; // todo
@@ -275,34 +285,26 @@ namespace FileSystem
 
         #region Other
 
-        public Inode GetInodeByPath(string path)
+        public Inode GetInodeByPath(string path, out Inode parentInode)
         {
             var absolutePath = _pathResolver.Resolve(path);
-            if (absolutePath == RootDirectoryPath) return RootDirectory.Inode;
-
-            var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
-            Directory dir;
-            string pathToSavable;
-            if (indexOfLastSplitter == -1)
+            if (absolutePath == RootDirectoryPath)
             {
-                pathToSavable = RootDirectoryPath;
-                dir = RootDirectory;
+                parentInode = null;
+                return RootDirectory.Inode;
             }
-            else
+
+            var splitPath = _pathResolver.SplitPath(absolutePath);
+            if (!TryGetDirectoryInodeByPath(splitPath.pathToSavable, out parentInode,
+                    out var dir, out var reason))
             {
-                pathToSavable = absolutePath[..indexOfLastSplitter];
-                if (!TryGetDirectoryInodeByPath(pathToSavable, out var parentInode,
-                        out dir, out var reason))
-                {
-                    throw new InvalidSavablePathException(reason);
-                }
+                throw new InvalidSavablePathException(reason);
             }
 
             var namesWithInodes = GetNamesWithInodes(dir);
-            var savableName = absolutePath[(indexOfLastSplitter + 1)..];
-            if (!namesWithInodes.TryGetValue(savableName, out var inode))
+            if (!namesWithInodes.TryGetValue(splitPath.savableName, out var inode))
             {
-                throw new CannotFindSavableException(pathToSavable, savableName);
+                throw new CannotFindSavableException(splitPath.pathToSavable, splitPath.savableName);
             }
 
             return inode;
@@ -312,16 +314,16 @@ namespace FileSystem
         {
             var absolutePath = _pathResolver.Resolve(path);
             if (CurrentDirectoryPath == absolutePath) return;
-            var inode = GetInodeByPath(absolutePath);
+            var inode = GetInodeByPath(absolutePath, out _);
             if (inode.FileType == FileType.Symlink)
             {
+                throw new NotImplementedException();
                 // todo
             }
             else if (inode.FileType != FileType.Directory)
             {
-                var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
-                throw new CannotChangeCurrentDirectoryException(absolutePath[..(indexOfLastSplitter - 1)],
-                    absolutePath[(indexOfLastSplitter + 1)..]);
+                var splitPath = _pathResolver.SplitPath(absolutePath);
+                throw new CannotChangeCurrentDirectoryException(splitPath.pathToSavable, splitPath.savableName);
             }
 
             var directory = ReadDirectory(inode);
@@ -435,21 +437,27 @@ namespace FileSystem
             return namesWithInodes;
         }
 
-        private List<Inode> GetChildrenInodes(Directory directory)
+        private List<int> GetChildrenIds(Directory directory)
         {
             var rawChildrenIds = directory.GetContent().ChildrenInodeIds;
             var startIndex = Directory.DirectoryContent.DefaultNumOfChildren;
-            List<Inode> childrenInodes = null;
+            List<int> childrenIds = null;
             if (rawChildrenIds.Count > startIndex)
             {
-                var childrenIds = rawChildrenIds.GetRangeByStartIndex(startIndex);
-                childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
+                childrenIds = rawChildrenIds.GetRangeByStartIndex(startIndex);
             }
 
-            return childrenInodes ?? new List<Inode>();
+            return childrenIds ?? new List<int>();
         }
 
-        private Inode GetParentByInode(Inode inode)
+        private List<Inode> GetChildrenInodes(Directory directory)
+        {
+            var childrenIds = GetChildrenIds(directory);
+            var childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
+            return childrenInodes;
+        }
+
+        private List<Inode> GetParentsByInode(Inode inode)
         {
             if (!inode.IsOccupied)
             {
@@ -461,17 +469,19 @@ namespace FileSystem
                 throw new RootDirectoryDoesNotHaveParentException();
             }
 
+            var numOfParents = inode.FileNames.Count;
+            var result = new List<Inode>(numOfParents);
             var directoriesQuery = new Queue<Directory>();
             directoriesQuery.Enqueue(RootDirectory);
-            while (directoriesQuery.Count > 0)
+            while (directoriesQuery.Count > 0 && result.Count < numOfParents)
             {
                 var curDir = directoriesQuery.Dequeue();
                 var children = GetChildrenInodes(curDir);
                 foreach (var child in children)
                 {
-                    if (child.FileNames.Any(name => inode.FileNames.Contains(name)))
+                    if (child.Id == inode.Id)
                     {
-                        return curDir.Inode;
+                        result.Add(child);
                     }
 
                     if (child.FileType == FileType.Directory)
@@ -518,7 +528,8 @@ namespace FileSystem
             if (folder.Inode.Id == RootFolderInodeId)
             {
                 RootDirectory = folder;
-            } else if (folder.Inode.Id == CurrentDirectory.Inode.Id)
+            }
+            else if (folder.Inode.Id == CurrentDirectory.Inode.Id)
             {
                 CWDData = (folder, CurrentDirectoryPath);
             }

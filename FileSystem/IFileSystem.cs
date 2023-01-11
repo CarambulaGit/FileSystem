@@ -24,8 +24,8 @@ namespace FileSystem
         RegularFile ReadFile(Inode inode);
         void SaveFile(RegularFile file);
         void DeleteFile(RegularFile file);
-        Inode GetInodeByPath(string path);
-        void DeleteFile(RegularFile file, string path);
+        Inode GetInodeByPath(string path, out Inode parentInode);
+        void DeleteFile(string path);
         void ChangeCurrentDirectory(string path);
     }
 }
