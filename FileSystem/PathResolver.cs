@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -24,6 +25,8 @@ namespace FileSystem
 
         private readonly Lazy<IFileSystem> _fileSystem;
         private IFileSystem FileSystem => _fileSystem.Value;
+        public string ParentDirectory => "..";
+        public string CurrentDirectory => ".";
 
         public PathResolver(Lazy<IFileSystem> fileSystem)
         {
@@ -33,29 +36,30 @@ namespace FileSystem
         public string Resolve(string path) =>
             ResolveAbsolutePath(IsPathAbsolute(path)
                 ? path
-                : Path.Combine(GetWorkingDirectoryPath(), path)
+                : $"{GetWorkingDirectoryPath()}{Path.AltDirectorySeparatorChar}{path}"
             );
 
         public string Resolve(Directory directory)
         {
             Inode GetInodeById(int curParentInodeId) => FileSystem.InodesSection.Inodes[curParentInodeId];
 
-            if (directory == FileSystem.RootDirectory)
+            if (directory.Inode.Id == FileSystem.RootDirectory.Inode.Id)
             {
-                return FileSystem.RootDirectoryPath;
+                return FileSystem.RootName;
             }
 
-            var sb = new StringBuilder();
+            var pathParts = new List<string> { directory.Inode.FileNames[0]};
             var curParentInode = GetInodeById(directory.GetParentDirectoryInodeId());
             while (curParentInode.Id != FileSystem.RootDirectory.Inode.Id)
             {
-                sb.Append(curParentInode.FileNames[0]);
+                pathParts.Add(curParentInode.FileNames[0]);
                 var parentDir = FileSystem.ReadDirectory(curParentInode);
                 curParentInode = GetInodeById(parentDir.GetParentDirectoryInodeId());
             }
 
-            // todo check
-            return sb.ToString();
+            pathParts.Add(FileSystem.RootName);
+            pathParts.Reverse();
+            return string.Join(Path.AltDirectorySeparatorChar, pathParts);
         }
 
         public bool IsPathAbsolute(string path) => path.StartsWith(FileSystem.RootDirectoryPath);
@@ -96,5 +100,7 @@ namespace FileSystem
     {
         string Resolve(string path);
         string Resolve(Directory directory);
+        string ParentDirectory { get; }
+        string CurrentDirectory { get; }
     }
 }
