@@ -104,6 +104,16 @@ namespace FileSystem
             return newFolder;
         }
 
+        public Directory ReadDirectory(string path)
+        {
+            if (!TryGetDirectoryInodeByPath(path, out var inode, out var dir, out var reason))
+            {
+                throw new InvalidSavablePathException(reason);
+            }
+
+            return dir;
+        }
+
         public Directory ReadDirectory(Inode inode)
         {
             var desiredType = FileType.Directory;
@@ -127,11 +137,7 @@ namespace FileSystem
         public void DeleteDirectory(string path)
         {
             var absolutePath = _pathResolver.Resolve(path);
-            if (!TryGetDirectoryInodeByPath(absolutePath, out var inode, out var dir, out var reason))
-            {
-                throw new InvalidSavablePathException(reason);
-            }
-            
+            var dir = ReadDirectory(absolutePath);
             DeleteDirectory(dir);
         }
 
@@ -189,6 +195,12 @@ namespace FileSystem
             return file;
         }
 
+        public RegularFile ReadFile(string path)
+        {
+            var inode = GetInodeByPath(path, out _);
+            return ReadFile(inode);
+        }
+
         public RegularFile ReadFile(Inode inode)
         {
             var desiredType = FileType.RegularFile;
@@ -233,7 +245,13 @@ namespace FileSystem
             }
         }
 
+        public void LinkFile(string pathToFile, string pathToCreatedLink) { }
+
         private bool FileNameValid(string name) => true; // todo
+
+        #endregion
+
+        #region Symlink
 
         #endregion
 
@@ -306,11 +324,7 @@ namespace FileSystem
             }
 
             var splitPath = _pathResolver.SplitPath(absolutePath);
-            if (!TryGetDirectoryInodeByPath(splitPath.pathToSavable, out parentInode,
-                    out var dir, out var reason))
-            {
-                throw new InvalidSavablePathException(reason);
-            }
+            var dir = ReadDirectory(splitPath.pathToSavable);
 
             var namesWithInodes = GetNamesWithInodes(dir);
             if (!namesWithInodes.TryGetValue(splitPath.savableName, out var inode))
@@ -318,6 +332,7 @@ namespace FileSystem
                 throw new CannotFindSavableException(splitPath.pathToSavable, splitPath.savableName);
             }
 
+            parentInode = dir.Inode;
             return inode;
         }
 

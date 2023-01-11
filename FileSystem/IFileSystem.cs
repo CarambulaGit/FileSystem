@@ -28,5 +28,7 @@ namespace FileSystem
         void DeleteFile(string path);
         void ChangeCurrentDirectory(string path);
         void DeleteDirectory(string path);
+        RegularFile ReadFile(string path);
+        Directory ReadDirectory(string path);
     }
 }
