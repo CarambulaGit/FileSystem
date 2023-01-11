@@ -65,13 +65,15 @@ namespace FileSystem
 
         public (string pathToSavable, string savableName) SplitPath(string absolutePath)
         {
-            if (IsPathAbsolute(absolutePath))
+            if (!IsPathAbsolute(absolutePath))
             {
                 throw new PathMustBeAbsoluteException(absolutePath);
             }
 
             var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
-            return absolutePath.SplitByIndex(indexOfLastSplitter);
+            var splitResult = absolutePath.SplitByIndex(indexOfLastSplitter);
+            splitResult = ($"{Path.AltDirectorySeparatorChar}{splitResult.first}", splitResult.second);
+            return splitResult;
         }
 
         private bool IsPathAbsolute(string path) => path.StartsWith(FileSystem.RootDirectoryPath);

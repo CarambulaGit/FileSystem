@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
 
 namespace Utils
 {
@@ -128,8 +129,10 @@ namespace Utils
                 return (str[..(index + 1)], second);
             }
 
-            second = second.Remove(0);
+            second = second.Remove(0, 1);
             return (str[..index], second);
         }
+
+        public static string ToStr<T>(this IEnumerable<T> enumerable) => string.Join(" ", enumerable);
     }
 }
