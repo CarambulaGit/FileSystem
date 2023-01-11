@@ -27,11 +27,12 @@ namespace FileSystem
 
         #region Properties
 
-        public string RootDirectoryPath => RootPath + Path.AltDirectorySeparatorChar;
-        public string RootPath => "";
+        public string RootDirectoryPath => RootName + Path.AltDirectorySeparatorChar;
         public string RootName => "";
-        public Directory CurrentDirectory { get; private set; }
+        public Directory CurrentDirectory => CWDData.directory;
+        public string CurrentDirectoryPath => CWDData.path;
         public Directory RootDirectory { get; private set; }
+        private (Directory directory, string path) CWDData { get; set; }
 
         public BitmapSection BitmapSection => _sectionSplitter.BitmapSection;
         public InodesSection InodesSection => _sectionSplitter.InodesSection;
@@ -56,7 +57,7 @@ namespace FileSystem
         {
             SplitSections();
             InitRootDirectory();
-            CurrentDirectory = RootDirectory;
+            CWDData = (RootDirectory, RootDirectoryPath);
         }
 
         private void SplitSections() => _sectionSplitter.SplitSections(_inodeAmount, _dataBlocksAmount);
@@ -307,6 +308,26 @@ namespace FileSystem
             return inode;
         }
 
+        public void ChangeCurrentDirectory(string path)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            if (CurrentDirectoryPath == absolutePath) return;
+            var inode = GetInodeByPath(absolutePath);
+            if (inode.FileType == FileType.Symlink)
+            {
+                // todo
+            }
+            else if (inode.FileType != FileType.Directory)
+            {
+                var indexOfLastSplitter = absolutePath.LastIndexOf(Path.AltDirectorySeparatorChar);
+                throw new CannotChangeCurrentDirectoryException(absolutePath[..(indexOfLastSplitter - 1)],
+                    absolutePath[(indexOfLastSplitter + 1)..]);
+            }
+
+            var directory = ReadDirectory(inode);
+            CWDData = (directory, path);
+        }
+
         private void DeleteSavable(Inode savableInode)
         {
             BitmapSection.Release(savableInode.OccupiedDataBlocks.Select(block => block.Address).ToArray());
@@ -492,11 +513,14 @@ namespace FileSystem
             return result;
         }
 
-        private void FolderChildChangeCallback(Directory parentFolder)
+        private void FolderChildChangeCallback(Directory folder)
         {
-            if (parentFolder.Inode.Id == RootFolderInodeId)
+            if (folder.Inode.Id == RootFolderInodeId)
             {
-                RootDirectory = parentFolder;
+                RootDirectory = folder;
+            } else if (folder.Inode.Id == CurrentDirectory.Inode.Id)
+            {
+                CWDData = (folder, CurrentDirectoryPath);
             }
         }
 

@@ -8,8 +8,8 @@ namespace FileSystem
     public interface IFileSystem
     {
         string RootDirectoryPath { get; }
-        string RootPath { get; }
         string RootName { get; }
+        string CurrentDirectoryPath { get; }
         Directory CurrentDirectory { get; }
         Directory RootDirectory { get; }
         BitmapSection BitmapSection { get; }
@@ -26,5 +26,6 @@ namespace FileSystem
         void DeleteFile(RegularFile file);
         Inode GetInodeByPath(string path);
         void DeleteFile(RegularFile file, string path);
+        void ChangeCurrentDirectory(string path);
     }
 }
