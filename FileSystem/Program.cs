@@ -24,11 +24,11 @@ namespace FileSystem
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices(services =>
                 {
-                    services.AddTransient<IHardDrive, HardDrive.HardDrive>()
-                        .AddTransient<ISerDes, SerDes.SerDes>()
-                        .AddTransient<IPathResolver, PathResolver>(serviceProvider => new PathResolver(
+                    services.AddScoped<IHardDrive, HardDrive.HardDrive>()
+                        .AddScoped<ISerDes, SerDes.SerDes>()
+                        .AddScoped<IPathResolver, PathResolver>(serviceProvider => new PathResolver(
                             new Lazy<IFileSystem>(serviceProvider.GetRequiredService<IFileSystem>)))
-                        .AddTransient<IFileSystem, FileSystem>(serviceProvider =>
+                        .AddScoped<IFileSystem, FileSystem>(serviceProvider =>
                         {
                             var hardDrive = serviceProvider.GetRequiredService<IHardDrive>();
                             var pathResolver = serviceProvider.GetRequiredService<IPathResolver>();
