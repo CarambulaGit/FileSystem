@@ -416,11 +416,11 @@ namespace FileSystem
             FolderChildChangeCallback(parentDir);
         }
 
-        private bool PathValid(string path, string name, out Inode parentInode, out string reason)
+        private bool PathValid(string path, string name, out Inode inode, out string reason)
         {
-            if (!TryGetDirectoryInodeByPath(path, out parentInode, out var currentDirectory, out reason)) return false;
+            if (!TryGetDirectoryInodeByPath(path, out inode, out var dir, out reason)) return false;
 
-            var namesWithInodes = GetNamesWithInodes(currentDirectory);
+            var namesWithInodes = GetNamesWithInodes(dir);
             if (namesWithInodes.ContainsKey(name))
             {
                 reason = $"There is already savable with name = {name}, at path = {path}";
