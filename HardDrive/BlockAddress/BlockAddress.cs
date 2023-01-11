@@ -21,5 +21,7 @@ namespace HardDrive
 
             return Address.Equals(item.Address);
         }
+
+        public override string ToString() => Address.ToString();
     }
 }

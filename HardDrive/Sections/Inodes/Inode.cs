@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using SerDes;
 using Utils;
 
@@ -41,6 +42,15 @@ namespace HardDrive
                    FileType.Equals(item.FileType) &&
                    LinksCount.Equals(item.LinksCount) &&
                    OccupiedDataBlocks.ContentsMatchOrdered(item.OccupiedDataBlocks);
+        }
+
+        public override string ToString()
+        {
+            return $"\nId = {Id}\n" +
+                   $"File Names = {FileNames.ToStr()}\n" +
+                   $"File Type = {FileType}\n" +
+                   $"Links Count = {LinksCount}\n" +
+                   $"Occupied data blocks = {OccupiedDataBlocks.ToStr()}\n";
         }
     }
 }
