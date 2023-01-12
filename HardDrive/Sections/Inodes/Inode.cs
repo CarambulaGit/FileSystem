@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using SerDes;
 using Utils;
 
@@ -46,11 +45,11 @@ namespace HardDrive
 
         public override string ToString()
         {
-            return $"\nId = {Id}\n" +
-                   $"File Names = {FileNames.ToStr()}\n" +
-                   $"File Type = {FileType}\n" +
-                   $"Links Count = {LinksCount}\n" +
-                   $"Occupied data blocks = {OccupiedDataBlocks.ToStr()}\n";
+            return $"\n\tId = {Id}\n" +
+                   $"\tFile Names = {FileNames.ToStr()}\n" +
+                   $"\tFile Type = {FileType}\n" +
+                   $"\tLinks Count = {LinksCount}\n" +
+                   $"\tOccupied data blocks = {OccupiedDataBlocks.ToStr()}\n";
         }
     }
 }

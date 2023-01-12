@@ -12,6 +12,8 @@ namespace FileSystem.Savable
         public struct RegularFileContent
         {
             public string Text { get; set; }
+
+            public override string ToString() => Text;
         }
 
         public RegularFile(Inode inode, bool fillContentWithDefaultValue = true) : base(inode)
@@ -28,5 +30,7 @@ namespace FileSystem.Savable
         public override int LinksCountDefault() => DefaultLinksCount;
 
         public override RegularFileContent GetContent() => Content.To<RegularFileContent>();
+
+        public override string ToString() => GetContent().ToString();
     }
 }

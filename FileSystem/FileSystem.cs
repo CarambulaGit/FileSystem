@@ -85,6 +85,15 @@ namespace FileSystem
 
         #region Directory
 
+        #region Directory/Create
+
+        public Directory CreateDirectory(string path)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            var splitPath = _pathResolver.SplitPath(absolutePath);
+            return CreateDirectory(splitPath.savableName, splitPath.pathToSavable);
+        }
+
         public Directory CreateDirectory(string name, string path)
         {
             if (!FolderNameValid(name))
@@ -104,9 +113,13 @@ namespace FileSystem
             return newFolder;
         }
 
+        #endregion
+
+        #region Directory/Read
+
         public Directory ReadDirectory(string path)
         {
-            if (!TryGetDirectoryInodeByPath(path, out var inode, out var dir, out var reason))
+            if (!TryGetDirectoryInodeByPath(path, out var dir, out var reason))
             {
                 throw new InvalidSavablePathException(reason);
             }
@@ -116,12 +129,7 @@ namespace FileSystem
 
         public Directory ReadDirectory(Inode inode)
         {
-            var desiredType = FileType.Directory;
-            if (inode.FileType != desiredType)
-            {
-                throw new IncorrectInodeTypeException(inode, desiredType);
-            }
-
+            CheckForType(inode, FileType.Directory);
             var blocksContent = GetDataBlocksContent(inode);
             var directory = new Directory(inode)
             {
@@ -130,9 +138,21 @@ namespace FileSystem
             return directory;
         }
 
+        #endregion
+
+        #region Directory/Save
+
+        public void SaveDirectory(Directory directory, Directory.DirectoryContent content)
+        {
+            directory.Content = content.ToByteArray();
+            SaveDirectory(directory);
+        }
+
         public void SaveDirectory(Directory directory) => SaveSavable(directory);
 
-        #region Delete
+        #endregion
+
+        #region Directory/Delete
 
         public void DeleteDirectory(string path)
         {
@@ -189,6 +209,15 @@ namespace FileSystem
 
         #region File
 
+        #region File/Create
+
+        public RegularFile CreateFile(string path)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            var splitPath = _pathResolver.SplitPath(absolutePath);
+            return CreateFile(splitPath.savableName, splitPath.pathToSavable);
+        }
+
         public RegularFile CreateFile(string name, string path)
         {
             if (!FileNameValid(name))
@@ -208,6 +237,10 @@ namespace FileSystem
             return file;
         }
 
+        #endregion
+
+        #region File/Read
+
         public RegularFile ReadFile(string path)
         {
             var inode = GetInodeByPath(path, out _);
@@ -216,12 +249,7 @@ namespace FileSystem
 
         public RegularFile ReadFile(Inode inode)
         {
-            var desiredType = FileType.RegularFile;
-            if (inode.FileType != desiredType)
-            {
-                throw new IncorrectInodeTypeException(inode, desiredType);
-            }
-
+            CheckForType(inode, FileType.RegularFile);
             var blocksContent = GetDataBlocksContent(inode);
             var file = new RegularFile(inode, false)
             {
@@ -230,33 +258,29 @@ namespace FileSystem
             return file;
         }
 
+        #endregion
+
+        #region File/Save
+
+        public void SaveFile(RegularFile file, RegularFile.RegularFileContent content)
+        {
+            file.Content = content.ToByteArray();
+            SaveFile(file);
+        }
+
         public void SaveFile(RegularFile file) => SaveSavable(file);
 
-        public void DeleteFile(RegularFile file)
-        {
-            var fileInode = file.Inode;
-            var parentsInodes = GetParentsByInode(fileInode);
-            parentsInodes.ForEach(parentInode => DeleteFromParent(fileInode, parentInode));
-            DeleteSavable(fileInode);
-        }
+        #endregion
 
-        public void DeleteFile(string path)
-        {
-            var absolutePath = _pathResolver.Resolve(path);
-            var inode = GetInodeByPath(absolutePath, out var parentInode);
-            DeleteFromParent(inode, parentInode);
-            var splitPath = _pathResolver.SplitPath(absolutePath);
-            inode.FileNames.Remove(splitPath.savableName);
-            inode.LinksCount--;
-            if (!inode.IsOccupied)
-            {
-                DeleteSavable(inode);
-            }
-            else
-            {
-                InodesSection.SaveInode(inode);
-            }
-        }
+        #region File/Delete
+
+        public void DeleteFile(RegularFile file) => DeleteSavable(file);
+
+        public void DeleteFile(string path) => DeleteSavable(path);
+
+        #endregion
+
+        #region File/Link
 
         public void LinkFile(string pathToFile, string pathToCreatedLink)
         {
@@ -272,11 +296,86 @@ namespace FileSystem
             InodesSection.SaveInode(fileInode);
         }
 
+        #endregion
+
         private bool FileNameValid(string name) => true; // todo
 
         #endregion
 
         #region Symlink
+
+        #region Symlink/Create
+
+        public Symlink CreateSymlink(string path, string pathToLink)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            var splitPath = _pathResolver.SplitPath(absolutePath);
+            return CreateSymlink(splitPath.savableName, splitPath.pathToSavable, _pathResolver.Resolve(pathToLink));
+        }
+
+        public Symlink CreateSymlink(string name, string path, string pathToLink)
+        {
+            if (!SymlinkNameValid(name))
+            {
+                throw new InvalidSymlinkNameException();
+            }
+
+            var parentFolder = GetParentOfNewSavable(name, path);
+            var freeInode = GetFreeInode();
+            var symlink = new Symlink(freeInode);
+            freeInode.LinksCount = symlink.LinksCountDefault();
+            freeInode.FileNames.Add(name);
+            freeInode.FileType = FileType.Symlink;
+            SaveSymlink(symlink, pathToLink);
+            AddChildToDirectory(freeInode, parentFolder);
+            FolderChildChangeCallback(parentFolder);
+            return symlink;
+        }
+
+        #endregion
+
+        #region Symlink/Read
+
+        public Symlink ReadSymlink(string path)
+        {
+            var inode = GetInodeByPath(path, out _);
+            return ReadSymlink(inode);
+        }
+
+        public Symlink ReadSymlink(Inode inode)
+        {
+            CheckForType(inode, FileType.Symlink);
+            var blocksContent = GetDataBlocksContent(inode);
+            var symlink = new Symlink(inode, false)
+            {
+                Content = blocksContent
+            };
+            return symlink;
+        }
+
+        #endregion
+
+        #region Symlink/Save
+
+        public void SaveSymlink(Symlink symlink) => SaveSavable(symlink);
+
+        public void SaveSymlink(Symlink symlink, string pathToLink)
+        {
+            symlink.Content = new Symlink.SymlinkContent {Address = pathToLink}.ToByteArray();
+            SaveSymlink(symlink);
+        }
+
+        #endregion
+
+        #region Symlink/Delete
+
+        public void DeleteSymlink(Symlink symlink) => DeleteSavable(symlink);
+
+        public void DeleteSymlink(string path) => DeleteSavable(path);
+
+        #endregion
+
+        private bool SymlinkNameValid(string name) => true;
 
         #endregion
 
@@ -322,21 +421,6 @@ namespace FileSystem
 
         #endregion
 
-        #region SavableConstructors
-
-        private Symlink ConstructSymlinkFromInode(Inode inode)
-        {
-            var desiredType = FileType.Symlink;
-            if (inode.FileType != desiredType)
-            {
-                throw new IncorrectInodeTypeException(inode, desiredType);
-            }
-
-            return new Symlink(inode);
-        }
-
-        #endregion
-
         #region Other
 
         public Inode GetInodeByPath(string path, out Inode parentInode)
@@ -363,13 +447,29 @@ namespace FileSystem
 
         public void ChangeCurrentDirectory(string path)
         {
+            void ThrowCannotResolveSymlinkAddress(Symlink.SymlinkContent symlinkContent) =>
+                throw new CannotResolveAddressFromSymlinkException(symlinkContent.Address);
+
             var absolutePath = _pathResolver.Resolve(path);
             if (CurrentDirectoryPath == absolutePath) return;
             var inode = GetInodeByPath(absolutePath, out _);
             if (inode.FileType == FileType.Symlink)
             {
-                throw new NotImplementedException();
-                // todo
+                var symlink = ReadSymlink(inode);
+                var symlinkContent = symlink.GetContent();
+                try
+                {
+                    ChangeCurrentDirectory(symlinkContent.Address);
+                    return;
+                }
+                catch (InvalidSavablePathException e)
+                {
+                    ThrowCannotResolveSymlinkAddress(symlinkContent);
+                }
+                catch (CannotFindSavableException e)
+                {
+                    ThrowCannotResolveSymlinkAddress(symlinkContent);
+                }
             }
             else if (inode.FileType != FileType.Directory)
             {
@@ -378,7 +478,69 @@ namespace FileSystem
             }
 
             var directory = ReadDirectory(inode);
-            CWDData = (directory, path);
+            CWDData = (directory, absolutePath);
+        }
+        
+        public string GetSavableContentString(string path)
+        {
+            var inode = GetInodeByPath(path, out _);
+            switch (inode.FileType)
+            {
+                case FileType.Directory:
+                    var dir = ReadDirectory(inode);
+                    return dir.ToString();
+                case FileType.RegularFile:
+                    var file = ReadFile(inode);
+                    return file.ToString();
+                case FileType.Symlink:
+                    var symlink = ReadSymlink(inode);
+                    return GetSavableContentString(symlink.GetContent().Address);
+                case FileType.None:
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        private void CheckForType(Inode inode, FileType desiredType)
+        {
+            if (inode.FileType != desiredType)
+            {
+                throw new IncorrectInodeTypeException(inode, desiredType);
+            }
+        }
+
+        /// <summary>
+        /// Delete all refs
+        /// </summary>
+        /// <typeparam name="T">Regular file and symlink only</typeparam>
+        private void DeleteSavable<T>(T savable) where T : BaseSavable
+        {
+            var savableInode = savable.Inode;
+            var parentsInodes = GetParentsByInode(savableInode);
+            parentsInodes.ForEach(parentInode => DeleteFromParent(savableInode, parentInode));
+            DeleteSavable(savableInode);
+        }
+
+        /// <summary>
+        /// Delete single ref 
+        /// </summary>
+        /// <param name="path">Path to regular file or symlink</param>
+        private void DeleteSavable(string path)
+        {
+            var absolutePath = _pathResolver.Resolve(path);
+            var inode = GetInodeByPath(absolutePath, out var parentInode);
+            DeleteFromParent(inode, parentInode);
+            var splitPath = _pathResolver.SplitPath(absolutePath);
+            inode.FileNames.Remove(splitPath.savableName);
+            inode.LinksCount--;
+            if (!inode.IsOccupied)
+            {
+                DeleteSavable(inode);
+            }
+            else
+            {
+                InodesSection.SaveInode(inode);
+            }
         }
 
         private void DeleteSavable(Inode savableInode)
@@ -442,23 +604,23 @@ namespace FileSystem
 
         private bool PathValid(string path, string name, out Inode inode, out string reason)
         {
-            if (!TryGetDirectoryInodeByPath(path, out inode, out var dir, out reason)) return false;
-
+            inode = null;
+            var absolutePath = _pathResolver.Resolve(path);
+            if (!TryGetDirectoryInodeByPath(absolutePath, out var dir, out reason)) return false;
+            inode = dir.Inode;
             var namesWithInodes = GetNamesWithInodes(dir);
             if (namesWithInodes.ContainsKey(name))
             {
-                reason = $"There is already savable with name = {name}, at path = {path}";
+                reason = $"There is already savable with name = {name}, at path = {absolutePath}";
                 return false;
             }
 
             return true;
         }
 
-        private bool TryGetDirectoryInodeByPath(string path, out Inode resultInode, out Directory dir,
-            out string reason)
+        private bool TryGetDirectoryInodeByPath(string path, out Directory dir, out string reason)
         {
             reason = string.Empty;
-            resultInode = null;
             var pathParts = path.Split(_pathResolver.Separator, StringSplitOptions.RemoveEmptyEntries);
             dir = RootDirectory;
             for (var i = 0; i < pathParts.Length; i++)
@@ -474,13 +636,20 @@ namespace FileSystem
 
                 if (inode.FileType == FileType.Symlink)
                 {
-                    throw new NotImplementedException();
+                    var symlink = ReadSymlink(inode);
+                    var symlinkContent = symlink.GetContent();
+                    if (!TryGetDirectoryInodeByPath(symlinkContent.Address, out dir, out reason))
+                    {
+                        reason += $"\nCan't resolve address from symlink\nAddress = {symlinkContent.Address}";
+                        return false;
+                    }
                 }
-
-                dir = ReadDirectory(inode);
+                else
+                {
+                    dir = ReadDirectory(inode);
+                }
             }
 
-            resultInode = dir.Inode;
             return true;
         }
 

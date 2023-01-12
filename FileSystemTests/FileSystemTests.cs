@@ -194,5 +194,46 @@ namespace PathResolverTests
             var hardlinkFile = _fileSystem.ReadFile(pathToCreatedLink);
             Assert.IsTrue(hardlinkFile.Inode == file.Inode);
         }
+
+        [Test]
+        public void SymlinkTest1()
+        {
+            var dir1Name = "dir1";
+            var dir2Name = "dir2";
+            var dirSymlinkName = "dir2Link";
+            var fileName = "file1";
+            var fileSymlinkName = "file1Link";
+            var dir2Path = _pathResolver.Combine(_fileSystem.RootName, dir1Name);
+            var dir1 = _fileSystem.CreateDirectory(dir1Name, _fileSystem.RootDirectoryPath);
+            var dir2 = _fileSystem.CreateDirectory(dir2Name, dir2Path);
+            var dir3 = _fileSystem.CreateSymlink(dirSymlinkName, _pathResolver.Combine(dir2Path, dir2Name));
+            var file1 = _fileSystem.CreateFile(fileName, dir2Path);
+            var file2 = _fileSystem.CreateSymlink(fileSymlinkName, _pathResolver.Combine(dir2Path, fileName));
+            var file1Str = _fileSystem.GetSavableContentString(_pathResolver.Combine(dir2Path, fileName));
+            var file2Str = _fileSystem.GetSavableContentString(fileSymlinkName);
+            Assert.AreEqual(file1Str, file2Str);
+            Assert.AreEqual(dir2.ToString(), _fileSystem.GetSavableContentString(dirSymlinkName));
+        }
+
+        [Test]
+        public void SymlinkTest2()
+        {
+            var dir1Name = "dir1";
+            var dir2Name = "dir2";
+            var dirSymlink1Name = "dir3Link2";
+            var dirSymlink2Name = "dir4Link3";
+            var fileName = "file1";
+            var fileSymlinkName = "file1Link";
+            var dir2Path = _pathResolver.Combine(_fileSystem.RootName, dir1Name);
+            var dir4Path = _pathResolver.Combine(dir2Path, dir2Name, dirSymlink2Name);
+            var dir1 = _fileSystem.CreateDirectory(dir1Name, _fileSystem.RootDirectoryPath);
+            var dir2 = _fileSystem.CreateDirectory(dir2Name, dir2Path);
+            var dir3 = _fileSystem.CreateSymlink(dirSymlink1Name, _pathResolver.Combine(dir2Path, dir2Name));
+            var dir4 = _fileSystem.CreateSymlink(dir4Path, dirSymlink1Name);
+            var file1 = _fileSystem.CreateFile(fileName, dir2Path);
+            var file2 = _fileSystem.CreateSymlink(fileSymlinkName, _pathResolver.Combine(dir2Path, fileName));
+            _fileSystem.ChangeCurrentDirectory(dir4Path);
+            Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir2.Inode.Id);
+        }
     }
 }

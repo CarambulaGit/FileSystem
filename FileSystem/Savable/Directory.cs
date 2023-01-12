@@ -26,6 +26,8 @@ namespace FileSystem.Savable
 
                 return ChildrenInodeIds.ContentsMatchOrdered(item.ChildrenInodeIds);
             }
+
+            public override string ToString() => $"\n\t Children ids = {ChildrenInodeIds.ToStr()}";
         }
 
         public Directory(Inode inode) : base(inode) { }
@@ -51,5 +53,7 @@ namespace FileSystem.Savable
         public int GetParentDirectoryInodeId() => GetParentDirectoryInodeId(GetContent());
 
         public int GetParentDirectoryInodeId(DirectoryContent directoryContent) => directoryContent.ChildrenInodeIds[0];
+
+        public override string ToString() => GetContent().ToString();
     }
 }
