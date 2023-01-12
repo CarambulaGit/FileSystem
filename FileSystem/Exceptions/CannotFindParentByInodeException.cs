@@ -1,7 +1,7 @@
 ﻿using System;
 using HardDrive;
 
-namespace FileSystem
+namespace FileSystem.Exceptions
 {
     public class CannotFindParentByInodeException : Exception
     {

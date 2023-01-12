@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FileSystem
+namespace FileSystem.Exceptions
 {
     public class CannotFindSavableException : Exception
     {
