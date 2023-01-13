@@ -1,4 +1,5 @@
 ﻿using System;
+using SerDes;
 
 namespace HardDrive
 {
@@ -8,9 +9,11 @@ namespace HardDrive
         private bool _initFromDrive;
         public int Size { get; private set; }
         public IHardDrive HardDrive { get; private set; }
+        protected ISerDes SerDes { get; private set; }
 
-        protected HardDriveSection(int size, IHardDrive hardDrive, bool initFromDrive = false)
+        protected HardDriveSection(int size, ISerDes serDes, IHardDrive hardDrive, bool initFromDrive = false)
         {
+            SerDes = serDes;
             Size = size;
             HardDrive = hardDrive;
             _initFromDrive = initFromDrive;

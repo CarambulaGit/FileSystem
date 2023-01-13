@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
@@ -9,7 +7,7 @@ namespace SerDes
 {
     public static class Utils
     {
-        public const int CharsForByte = 8;
+        public const int CharsForByte = Constants.BitesInByte;
         private const string EmptyByte = "\0\0\0\0\0\0\0\0";
 
         // Convert an object to a byte array

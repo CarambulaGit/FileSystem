@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using HardDrive;
 using NUnit.Framework;
 using SerDes;
@@ -24,7 +25,7 @@ namespace SerDesTests
         {
             using (var stream = File.Open("test.txt", FileMode.OpenOrCreate))
             {
-                var section = new BitmapSection(1, _hardDrive, false);
+                var section = new BitmapSection(1, _serDes, _hardDrive, false);
                 section.OccupiedMask[0] = true;
                 var byteArray = section.OccupiedMask.ToByteArray();
                 _serDes.Write(stream, byteArray);
@@ -83,10 +84,10 @@ namespace SerDesTests
         {
             var hardDrive = new HardDrive.HardDrive(_serDes, "test4.txt");
             var size = 2;
-            var section = new BitmapSection(size, hardDrive, false);
+            var section = new BitmapSection(size, _serDes, hardDrive, false);
             section.OccupiedMask[0] = true;
             section.SaveSection();
-            var section2 = new BitmapSection(size, hardDrive, true);
+            var section2 = new BitmapSection(size, _serDes, hardDrive, true);
             Assert.IsTrue(section.OccupiedMask.ContentsMatchOrdered(section2.OccupiedMask));
         }
 
@@ -95,13 +96,13 @@ namespace SerDesTests
         {
             var hardDrive = new HardDrive.HardDrive(_serDes, "test5.txt");
             var bitmapSize = 0;
-            var section = new InodesSection(1, hardDrive, bitmapSize, false);
+            var section = new InodesSection(1, _serDes, hardDrive, bitmapSize, false);
             section.Inodes[0].OccupiedDataBlocks = new BlockAddress[]
             {
                 new BlockAddress(1),
             };
             section.SaveInode(section.Inodes[0]);
-            var section2 = new InodesSection(1, hardDrive, bitmapSize, true);
+            var section2 = new InodesSection(1, _serDes, hardDrive, bitmapSize, true);
             Assert.IsTrue(section.Inodes.ContentsMatch(section2.Inodes));
         }
 
@@ -111,9 +112,9 @@ namespace SerDesTests
             var hardDrive = new HardDrive.HardDrive(_serDes, "test6.txt");
             var bitmapSize = 0;
             var inodesSize = 0;
-            var section = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, false);
+            var section = new DataBlocksSection(1, _serDes, hardDrive, bitmapSize, inodesSize, false);
             section.WriteBlock(0, "TestDataBlocks".ToByteArray().ByteArrayToBinaryStr());
-            var section2 = new DataBlocksSection(1, hardDrive, bitmapSize, inodesSize, true);
+            var section2 = new DataBlocksSection(1, _serDes, hardDrive, bitmapSize, inodesSize, true);
             Assert.IsTrue(section.ReadBlock(0).ContentsMatchOrdered(section2.ReadBlock(0)));
         }
 
@@ -122,12 +123,12 @@ namespace SerDesTests
         {
             var hardDrive = new HardDrive.HardDrive(_serDes, "test7.txt");
             var size = 2;
-            var bitmapSection = new BitmapSection(size, hardDrive, false);
+            var bitmapSection = new BitmapSection(size, _serDes, hardDrive, false);
             bitmapSection.OccupiedMask[0] = true;
             bitmapSection.SaveSection();
 
             var bitmapLength = bitmapSection.Length();
-            var inodesSection = new InodesSection(1, hardDrive, bitmapLength, false);
+            var inodesSection = new InodesSection(1, _serDes, hardDrive, bitmapLength, false);
             inodesSection.Inodes[0].OccupiedDataBlocks = new BlockAddress[]
             {
                 new BlockAddress(1),
@@ -135,15 +136,28 @@ namespace SerDesTests
             inodesSection.SaveInode(inodesSection.Inodes[0]);
 
             var inodesLength = inodesSection.Length();
-            var dataBlocksSection = new DataBlocksSection(1, hardDrive, bitmapLength, inodesLength, false);
+            var dataBlocksSection = new DataBlocksSection(1, _serDes, hardDrive, bitmapLength, inodesLength, false);
             dataBlocksSection.WriteBlock(0, "TestDataBlocks".ToByteArray().ByteArrayToBinaryStr());
-            
-            var bitmapSection1 = new BitmapSection(size, hardDrive, true);
+
+            var bitmapSection1 = new BitmapSection(size, _serDes, hardDrive, true);
             Assert.IsTrue(bitmapSection.OccupiedMask.ContentsMatchOrdered(bitmapSection1.OccupiedMask));
-            var inodesSection1 = new InodesSection(1, hardDrive, bitmapLength, true);
+            var inodesSection1 = new InodesSection(1, _serDes, hardDrive, bitmapLength, true);
             Assert.IsTrue(inodesSection.Inodes.ContentsMatch(inodesSection1.Inodes));
-            var dataBlocksSection1 = new DataBlocksSection(1, hardDrive, bitmapLength, inodesLength, true);
+            var dataBlocksSection1 = new DataBlocksSection(1, _serDes, hardDrive, bitmapLength, inodesLength, true);
             Assert.IsTrue(dataBlocksSection.ReadBlock(0).ContentsMatchOrdered(dataBlocksSection1.ReadBlock(0)));
+        }
+
+        [Test]
+        public void WritingBytesIntoSerializedStringTest()
+        {
+            var str = "Andrew loh";
+            var byteArray = str.ToByteArray();
+            var strBytes = byteArray.ToList();
+            var toAdd = new byte[] {0, 34, 55, 66};
+            var strLengthIndex = 22;
+            strBytes[strLengthIndex] = (byte) (str.Length + toAdd.Length);
+            strBytes.InsertRange(strLengthIndex + 1, toAdd);
+            Console.WriteLine(strBytes.ToArray().To<string>());
         }
     }
 }

@@ -29,7 +29,6 @@ namespace FileSystem
         RegularFile ReadFile(Inode inode);
         void SaveFile(RegularFile file);
         void DeleteFile(string path);
-        void DeleteFile(RegularFile file);
         void LinkFile(string pathToFile, string pathToCreatedLink);
         Inode GetInodeByPath(string path, out Inode parentInode);
         void ChangeCurrentDirectory(string path);
@@ -41,8 +40,16 @@ namespace FileSystem
         Symlink ReadSymlink(Inode inode);
         void SaveSymlink(Symlink symlink);
         void SaveSymlink(Symlink symlink, string pathToLink);
-        void DeleteSymlink(Symlink symlink);
         void DeleteSymlink(string path);
         string GetSavableContentString(string path);
+        byte[] ReadFile(string descriptor, int numOfBytesToRead);
+        void SaveFile(string descriptor, byte[] dataToWrite);
+        void OpenFile(string path, string descriptor);
+        void OpenFile(RegularFile file, string descriptor);
+        void CloseFile(string descriptor);
+        void SeekFile(string descriptor, int offsetInBytes);
+        void TruncateFile(string path, int size);
+        string GetInodeData(string path);
+        string GetCWDData();
     }
 }

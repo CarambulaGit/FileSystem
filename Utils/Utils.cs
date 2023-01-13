@@ -1,8 +1,7 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 
 namespace Utils
 {
@@ -74,19 +73,21 @@ namespace Utils
             return true;
         }
 
-        public static void FillWith<T>(this T[] array, Func<T> elemToFill)
+        public static T[] FillWith<T>(this T[] array, Func<T> elemToFill)
         {
             for (var i = 0; i < array.Length; i++)
                 array[i] = elemToFill.Invoke();
+            return array;
         }
 
-        public static void FillWith<T>(this T[] array, Func<int, T> elemToFill)
+        public static T[] FillWith<T>(this T[] array, Func<int, T> elemToFill)
         {
             for (var i = 0; i < array.Length; i++)
                 array[i] = elemToFill.Invoke(i);
+            return array;
         }
 
-        public static T FirstOrValue<T>(this IEnumerable<T> enumerable, Predicate<T> predicate, T valueIfNotFound)
+        public static T? FirstOrValue<T>(this IEnumerable<T> enumerable, Predicate<T> predicate, T? valueIfNotFound)
         {
             foreach (var elem in enumerable)
             {

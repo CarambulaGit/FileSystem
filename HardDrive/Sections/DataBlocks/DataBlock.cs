@@ -4,11 +4,8 @@ namespace HardDrive
 {
     public class DataBlock
     {
-        private const int StringDefaultLength = 192;
-        private const int StringCharLength = 8;
-        // public const int ContentCharsCapacity = (BlockLength - StringDefaultLength) / StringCharLength;
         public const int BlockLengthInBytes = 4096;
-        public const int BlockLength = BlockLengthInBytes * 8;
+        public const int BlockLength = BlockLengthInBytes * Constants.BitesInByte;
 
         public IHardDrive HardDrive { get; private set; }
         public int Offset { get; private set; }

@@ -4,11 +4,15 @@ namespace SerDes
 {
     public class SerDes : ISerDes
     {
+        public int EmptyBoolArrayLength => 224;
+        public int BoolArrayElemLength => Constants.BitesInByte;
+        public int RegularFileStringLengthIndex => 179;
+
         public char[] Read(FileStream fileStream, int toRead, int offset = 0)
         {
             using var b = new StreamReader(fileStream);
             b.BaseStream.Seek(offset, SeekOrigin.Begin);
-            var by = new char[toRead]; 
+            var by = new char[toRead];
             b.Read(by);
             return by;
         }

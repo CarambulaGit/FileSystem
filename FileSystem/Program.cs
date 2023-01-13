@@ -32,7 +32,8 @@ namespace FileSystem
                         {
                             var hardDrive = serviceProvider.GetRequiredService<IHardDrive>();
                             var pathResolver = serviceProvider.GetRequiredService<IPathResolver>();
-                            return new FileSystem(hardDrive, pathResolver, fileSystemConfiguration.inodesAmount,
+                            var serDes = serviceProvider.GetRequiredService<ISerDes>();
+                            return new FileSystem(serDes, hardDrive, pathResolver, fileSystemConfiguration.inodesAmount,
                                 fileSystemConfiguration.dataBlocksAmount, fileSystemConfiguration.initFromDrive);
                         });
                 }).Build();

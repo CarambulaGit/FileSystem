@@ -1,8 +1,9 @@
 using System;
 using FileSystem.Exceptions;
+using FileSystem.Savable;
 using HardDrive;
 
-namespace FileSystem.Savable
+namespace FileSystem
 {
     public static class FileTypeExtension
     {

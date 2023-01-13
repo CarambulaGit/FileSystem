@@ -10,8 +10,8 @@ namespace HardDrive
         private int _inodesLength;
         private DataBlock[] _dataBlocks;
 
-        public DataBlocksSection(int size, IHardDrive hardDrive, int bitmapLength, int inodesLength,
-            bool initFromDrive = false) : base(size, hardDrive, initFromDrive)
+        public DataBlocksSection(int size, ISerDes serDes, IHardDrive hardDrive, int bitmapLength, int inodesLength,
+            bool initFromDrive = false) : base(size, serDes, hardDrive, initFromDrive)
         {
             _bitmapLength = bitmapLength;
             _inodesLength = inodesLength;
@@ -43,19 +43,11 @@ namespace HardDrive
             return _dataBlocks[index].Read();
         }
 
-        // public void WriteBlock(int index, byte[] toWrite)
-        // {
-        //     CheckBlock(index);
-        //     _dataBlocks[index].Write(toWrite);
-        // }
-
         public void WriteBlock(int index, string binaryStrToWrite)
         {
             CheckBlock(index);
             _dataBlocks[index].Write(binaryStrToWrite);
         }
-
-        // public void WriteBlock(int index, string toWrite) => WriteBlock(index, toWrite.ToByteArray());
 
         protected override void InitData() => InitDataBlocks();
 

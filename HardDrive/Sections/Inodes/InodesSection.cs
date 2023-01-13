@@ -12,9 +12,8 @@ namespace HardDrive
         private int _bitmapLength;
         public Inode[] Inodes { get; private set; }
 
-        public InodesSection(int size, IHardDrive hardDrive, int bitmapLength, bool initFromDrive = false) : base(size,
-            hardDrive,
-            initFromDrive)
+        public InodesSection(int size, ISerDes serDes, IHardDrive hardDrive, int bitmapLength,
+            bool initFromDrive = false) : base(size, serDes, hardDrive, initFromDrive)
         {
             _bitmapLength = bitmapLength;
             Initialize();

@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Text;
 using FileSystem.Exceptions;
 using FileSystem.Savable;
 using HardDrive;
+using Microsoft.Extensions.Primitives;
 using SerDes;
 using Utils;
 using Directory = FileSystem.Savable.Directory;
@@ -16,12 +17,15 @@ namespace FileSystem
         #region Fields
 
         public const int RootFolderInodeId = 0;
+        public const int MaxNumOfOpenedFiles = 5;
         private readonly IHardDrive _hardDrive;
         private readonly IPathResolver _pathResolver;
         private readonly SectionSplitter _sectionSplitter;
+        private readonly Dictionary<string, (int offset, RegularFile file)> _openedFiles = new();
         private int _inodeAmount;
         private int _dataBlocksAmount;
         private bool _initFromDrive;
+        private ISerDes _serDes;
 
         #endregion
 
@@ -42,15 +46,17 @@ namespace FileSystem
 
         #region Initialize
 
-        public FileSystem(IHardDrive hardDrive, IPathResolver pathResolver, int inodeAmount, int dataBlocksAmount,
+        public FileSystem(ISerDes serDes, IHardDrive hardDrive, IPathResolver pathResolver, int inodeAmount,
+            int dataBlocksAmount,
             bool initFromDrive = false)
         {
             _pathResolver = pathResolver;
+            _serDes = serDes;
             _hardDrive = hardDrive;
             _inodeAmount = inodeAmount;
             _dataBlocksAmount = dataBlocksAmount;
             _initFromDrive = initFromDrive;
-            _sectionSplitter = new SectionSplitter(_hardDrive, _initFromDrive);
+            _sectionSplitter = new SectionSplitter(_serDes, _hardDrive, _initFromDrive);
         }
 
         public void Initialize()
@@ -72,10 +78,10 @@ namespace FileSystem
         private Directory CreateRootDirectory()
         {
             var freeInode = InodesSection.Inodes[RootFolderInodeId];
-            var directory = new Directory(freeInode, freeInode.Id);
-            freeInode.LinksCount = directory.LinksCountDefault();
             freeInode.FileNames.Add(RootName);
             freeInode.FileType = FileType.Directory;
+            var directory = new Directory(freeInode, freeInode.Id, RootName);
+            freeInode.LinksCount = directory.LinksCountDefault();
             InodesSection.SaveInode(freeInode);
             SaveDirectory(directory);
             return directory;
@@ -103,12 +109,12 @@ namespace FileSystem
 
             var parentFolder = GetParentOfNewSavable(name, path);
             var freeInode = GetFreeInode();
-            var newFolder = new Directory(freeInode, parentFolder.Inode.Id);
-            freeInode.LinksCount = newFolder.LinksCountDefault();
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.Directory;
+            var newFolder = new Directory(freeInode, parentFolder.Inode.Id, parentFolder.Inode.FileNames[0]);
+            freeInode.LinksCount = newFolder.LinksCountDefault();
             SaveDirectory(newFolder);
-            AddChildToDirectory(freeInode, parentFolder);
+            AddChildToDirectory(freeInode, name, parentFolder);
             FolderChildChangeCallback(parentFolder);
             return newFolder;
         }
@@ -133,7 +139,7 @@ namespace FileSystem
             var blocksContent = GetDataBlocksContent(inode);
             var directory = new Directory(inode)
             {
-                Content = blocksContent
+                Content = blocksContent[..inode.FileSize]
             };
             return directory;
         }
@@ -170,7 +176,7 @@ namespace FileSystem
             }
 
             var dirContent = directory.GetContent();
-            if (dirContent.ChildrenInodeIds.Count > Directory.DirectoryContent.DefaultNumOfChildren)
+            if (dirContent.ChildrenInodeData.Count > Directory.DirectoryContent.DefaultNumOfChildren)
             {
                 throw new DirectoryHasChildrenException();
             }
@@ -187,17 +193,17 @@ namespace FileSystem
             parentInode.LinksCount--;
             InodesSection.SaveInode(parentInode);
 
-            DeleteFromParent(dirInode, parentInode);
+            DeleteFromParent(dirInode, dirInode.FileNames[0], parentInode);
         }
 
         #endregion
 
         private bool FolderNameValid(string name) => true; // todo
 
-        private void AddChildToDirectory(Inode childInode, Directory directory)
+        private void AddChildToDirectory(Inode childInode, string name, Directory directory)
         {
             var dirContent = directory.GetContent();
-            dirContent.ChildrenInodeIds.Add(childInode.Id);
+            dirContent.ChildrenInodeData.Add((childInode.Id, name));
             directory.Content = dirContent.ToByteArray();
             SaveDirectory(directory);
             if (childInode.FileType != FileType.Directory) return;
@@ -232,7 +238,7 @@ namespace FileSystem
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.RegularFile;
             SaveFile(file);
-            AddChildToDirectory(freeInode, parentFolder);
+            AddChildToDirectory(freeInode, name, parentFolder);
             FolderChildChangeCallback(parentFolder);
             return file;
         }
@@ -243,7 +249,14 @@ namespace FileSystem
 
         public RegularFile ReadFile(string path)
         {
-            var inode = GetInodeByPath(path, out _);
+            var absolutePath = _pathResolver.Resolve(path);
+            var inode = GetInodeByPath(absolutePath, out _);
+            if (inode.FileType == FileType.Symlink)
+            {
+                var symlink = ReadSymlink(inode);
+                return ReadFile(symlink.GetContent().Address);
+            }
+
             return ReadFile(inode);
         }
 
@@ -253,9 +266,21 @@ namespace FileSystem
             var blocksContent = GetDataBlocksContent(inode);
             var file = new RegularFile(inode, false)
             {
-                Content = blocksContent
+                Content = blocksContent[..inode.FileSize]
             };
             return file;
+        }
+
+        public byte[] ReadFile(string descriptor, int numOfBytesToRead)
+        {
+            // todo test (empty file)
+            CheckIfDescriptorInitialized(descriptor);
+            var openedFile = _openedFiles[descriptor];
+            var file = openedFile.file;
+            var offset = GetRealOffset(openedFile.offset);
+            var readTo = Math.Min(offset + numOfBytesToRead, file.Inode.FileSize - 1);
+            _openedFiles[descriptor] = (readTo, file);
+            return file.Content[offset..readTo];
         }
 
         #endregion
@@ -270,13 +295,33 @@ namespace FileSystem
 
         public void SaveFile(RegularFile file) => SaveSavable(file);
 
+        public void SaveFile(string descriptor, byte[] dataToWrite)
+        {
+            CheckIfDescriptorInitialized(descriptor);
+            var openedFile = _openedFiles[descriptor];
+            SaveFile(openedFile.file, dataToWrite, openedFile.offset);
+        }
+
+        private void SaveFile(RegularFile file, byte[] dataToWrite, int offset = 0)
+        {
+            var content = file.Content.ToList();
+            var strLengthIndex = _serDes.RegularFileStringLengthIndex;
+            content[strLengthIndex] = (byte) (content[strLengthIndex] + dataToWrite.Length);
+            content.InsertRange(GetRealOffset(offset), dataToWrite);
+            file.Content = content.ToArray();
+            SaveFile(file);
+        }
+
         #endregion
 
         #region File/Delete
 
-        public void DeleteFile(RegularFile file) => DeleteSavable(file);
-
-        public void DeleteFile(string path) => DeleteSavable(path);
+        public void DeleteFile(string path)
+        {
+            var file = ReadFile(path);
+            CheckIfFileCanBeDeleted(file);
+            DeleteSavable(path);
+        }
 
         #endregion
 
@@ -285,18 +330,124 @@ namespace FileSystem
         public void LinkFile(string pathToFile, string pathToCreatedLink)
         {
             var file = ReadFile(pathToFile);
-            var absolutePathToCreatedLink = pathToCreatedLink;
-            var splitPath = _pathResolver.SplitPath(absolutePathToCreatedLink);
-            CheckPath(splitPath.savableName, splitPath.pathToSavable, out var parentFolderInode);
+            var absolutePathToCreatedLink = _pathResolver.Resolve(pathToCreatedLink);
+            var splitPathToLink = _pathResolver.SplitPath(absolutePathToCreatedLink);
+            CheckPath(splitPathToLink.savableName, splitPathToLink.pathToSavable, out var parentFolderInode);
             var linkParentDir = ReadDirectory(parentFolderInode);
             var fileInode = file.Inode;
-            AddChildToDirectory(fileInode, linkParentDir);
-            fileInode.FileNames.Add(splitPath.savableName);
+            AddChildToDirectory(fileInode, splitPathToLink.savableName, linkParentDir);
+            fileInode.FileNames.Add(splitPathToLink.savableName);
             fileInode.LinksCount++;
             InodesSection.SaveInode(fileInode);
         }
 
         #endregion
+
+        #region File/Open
+
+        public void OpenFile(string path, string descriptor)
+        {
+            CheckBeforeOpenFile(descriptor);
+            var absolutePath = _pathResolver.Resolve(path);
+            var inode = GetInodeByPath(absolutePath, out _);
+            CheckForType(inode, FileType.RegularFile);
+            var file = ReadFile(inode);
+            UnsafeOpenFile(file, descriptor);
+        }
+
+        public void OpenFile(RegularFile file, string descriptor)
+        {
+            CheckBeforeOpenFile(descriptor);
+            UnsafeOpenFile(file, descriptor);
+        }
+
+        private void UnsafeOpenFile(RegularFile file, string descriptor) => _openedFiles.Add(descriptor, (0, file));
+
+        private void CheckBeforeOpenFile(string descriptor)
+        {
+            if (_openedFiles.Count >= MaxNumOfOpenedFiles)
+            {
+                throw new MaxNumOfOpenedFilesReachedException();
+            }
+
+            if (_openedFiles.ContainsKey(descriptor))
+            {
+                throw new DescriptorAlreadyBusyException();
+            }
+        }
+
+        #endregion
+
+        #region File/Close
+
+        public void CloseFile(string descriptor)
+        {
+            CheckIfDescriptorInitialized(descriptor);
+            _openedFiles.Remove(descriptor);
+        }
+
+        #endregion
+
+        #region File/Seek
+
+        public void SeekFile(string descriptor, int offsetInBytes)
+        {
+            CheckIfDescriptorInitialized(descriptor);
+            var openedFile = _openedFiles[descriptor];
+            _openedFiles[descriptor] = (offsetInBytes, openedFile.file);
+        }
+
+        #endregion
+
+        #region File/Truncate
+
+        public void TruncateFile(string path, int size)
+        {
+            var file = ReadFile(path);
+            var delta = file.Inode.FileSize - size;
+            if (delta > 0)
+            {
+                var endIndex = file.Inode.FileSize - 1;
+                var minSize = file.Inode.FileSize - file.Content[_serDes.RegularFileStringLengthIndex];
+                if (size < minSize)
+                    throw new CannotTruncateFileToGivenSizeException(size, minSize);
+
+                var content = file.Content.ToList();
+                var strLengthIndex = _serDes.RegularFileStringLengthIndex;
+                content[strLengthIndex] = (byte) (content[strLengthIndex] - delta);
+                content.RemoveRange(endIndex - delta, delta);
+                file.Content = content.ToArray();
+                SaveFile(file);
+            }
+            else
+            {
+                var dataToWrite = new byte[-delta].FillWith(() => (byte) '0');
+                SaveFile(file, dataToWrite, file.Content[_serDes.RegularFileStringLengthIndex]);
+            }
+        }
+
+        #endregion
+
+        private int GetRealOffset(int rawOffset) => _serDes.RegularFileStringLengthIndex + rawOffset + 1;
+
+        private void CheckIfFileCanBeDeleted(RegularFile file)
+        {
+            var fileOpened = _openedFiles.Values
+                .Select(openedFile => openedFile.file)
+                .FirstOrDefault(openedFile => openedFile.Inode.Id == file.Inode.Id) != null;
+            if (fileOpened)
+            {
+                throw new CannotDeleteOpenedFileException(file);
+            }
+        }
+
+        private void CheckIfDescriptorInitialized(string descriptor)
+        {
+            if (!_openedFiles.ContainsKey(descriptor))
+            {
+                throw new NotInitializedDescriptorException(descriptor);
+            }
+        }
 
         private bool FileNameValid(string name) => true; // todo
 
@@ -327,7 +478,7 @@ namespace FileSystem
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.Symlink;
             SaveSymlink(symlink, pathToLink);
-            AddChildToDirectory(freeInode, parentFolder);
+            AddChildToDirectory(freeInode, name, parentFolder);
             FolderChildChangeCallback(parentFolder);
             return symlink;
         }
@@ -348,7 +499,7 @@ namespace FileSystem
             var blocksContent = GetDataBlocksContent(inode);
             var symlink = new Symlink(inode, false)
             {
-                Content = blocksContent
+                Content = blocksContent[..inode.FileSize]
             };
             return symlink;
         }
@@ -368,8 +519,6 @@ namespace FileSystem
         #endregion
 
         #region Symlink/Delete
-
-        public void DeleteSymlink(Symlink symlink) => DeleteSavable(symlink);
 
         public void DeleteSymlink(string path) => DeleteSavable(path);
 
@@ -480,7 +629,7 @@ namespace FileSystem
             var directory = ReadDirectory(inode);
             CWDData = (directory, absolutePath);
         }
-        
+
         public string GetSavableContentString(string path)
         {
             var inode = GetInodeByPath(path, out _);
@@ -501,6 +650,33 @@ namespace FileSystem
             }
         }
 
+        public string GetInodeData(string path)
+        {
+            var inode = GetInodeByPath(path, out _);
+            return inode.ToString();
+        }
+
+        public string GetCWDData()
+        {
+            var cwdContent = CurrentDirectory.GetContent();
+            var sb = new StringBuilder();
+            sb.Append($"Directory {CurrentDirectory.Inode.FileNames[0]} data:\n");
+            for (var i = 0; i < cwdContent.ChildrenInodeData.Count; i++)
+            {
+                var savableData = cwdContent.ChildrenInodeData[i];
+                var inode = InodesSection.Inodes[savableData.id];
+                var name = i switch
+                {
+                    0 => _pathResolver.ParentDirectory,
+                    1 => _pathResolver.CurrentDirectory,
+                    _ => savableData.name
+                };
+                sb.Append($"\t{inode.ToShortStr(name)}\n");
+            }
+
+            return sb.ToString();
+        }
+
         private void CheckForType(Inode inode, FileType desiredType)
         {
             if (inode.FileType != desiredType)
@@ -510,27 +686,21 @@ namespace FileSystem
         }
 
         /// <summary>
-        /// Delete all refs
-        /// </summary>
-        /// <typeparam name="T">Regular file and symlink only</typeparam>
-        private void DeleteSavable<T>(T savable) where T : BaseSavable
-        {
-            var savableInode = savable.Inode;
-            var parentsInodes = GetParentsByInode(savableInode);
-            parentsInodes.ForEach(parentInode => DeleteFromParent(savableInode, parentInode));
-            DeleteSavable(savableInode);
-        }
-
-        /// <summary>
         /// Delete single ref 
         /// </summary>
         /// <param name="path">Path to regular file or symlink</param>
         private void DeleteSavable(string path)
         {
             var absolutePath = _pathResolver.Resolve(path);
-            var inode = GetInodeByPath(absolutePath, out var parentInode);
-            DeleteFromParent(inode, parentInode);
             var splitPath = _pathResolver.SplitPath(absolutePath);
+            var parentDir = ReadDirectory(splitPath.pathToSavable);
+            var namesWithInodes = GetNamesWithInodes(parentDir);
+            if (!namesWithInodes.TryGetValue(splitPath.savableName, out var inode))
+            {
+                throw new CannotFindSavableException(splitPath.pathToSavable, splitPath.savableName);
+            }
+
+            DeleteFromParent(inode, splitPath.savableName, parentDir.Inode);
             inode.FileNames.Remove(splitPath.savableName);
             inode.LinksCount--;
             if (!inode.IsOccupied)
@@ -568,6 +738,7 @@ namespace FileSystem
                 savable.Inode.OccupiedDataBlocks = occupiedBlocks.Concat(blockAddresses).ToArray();
             }
 
+            savable.Inode.FileSize = savable.Content.Length;
             InodesSection.SaveInode(savable.Inode);
             occupiedBlocks = savable.Inode.OccupiedDataBlocks;
             for (var i = 0; i < splitData.Length; i++)
@@ -592,11 +763,11 @@ namespace FileSystem
             }
         }
 
-        private void DeleteFromParent(Inode savableInode, Inode parentInode)
+        private void DeleteFromParent(Inode savableInode, string name, Inode parentInode)
         {
             var parentDir = ReadDirectory(parentInode);
             var parentDirContent = parentDir.GetContent();
-            parentDirContent.ChildrenInodeIds.Remove(savableInode.Id);
+            parentDirContent.ChildrenInodeData.Remove((savableInode.Id, name));
             parentDir.Content = parentDirContent.ToByteArray();
             SaveDirectory(parentDir);
             FolderChildChangeCallback(parentDir);
@@ -626,17 +797,17 @@ namespace FileSystem
             for (var i = 0; i < pathParts.Length; i++)
             {
                 var namesWithInodes = GetNamesWithInodes(dir);
-                if (!namesWithInodes.TryGetValue(pathParts[i], out var inode) ||
-                    (inode.FileType != FileType.Symlink && inode.FileType != FileType.Directory))
+                if (!namesWithInodes.TryGetValue(pathParts[i], out var savableData) ||
+                    (savableData.FileType != FileType.Symlink && savableData.FileType != FileType.Directory))
                 {
                     reason =
                         $"Can't find directory with name = {pathParts[i]}, at path = {_pathResolver.Combine(pathParts[..i])}";
                     return false;
                 }
 
-                if (inode.FileType == FileType.Symlink)
+                if (savableData.FileType == FileType.Symlink)
                 {
-                    var symlink = ReadSymlink(inode);
+                    var symlink = ReadSymlink(savableData);
                     var symlinkContent = symlink.GetContent();
                     if (!TryGetDirectoryInodeByPath(symlinkContent.Address, out dir, out reason))
                     {
@@ -646,7 +817,7 @@ namespace FileSystem
                 }
                 else
                 {
-                    dir = ReadDirectory(inode);
+                    dir = ReadDirectory(savableData);
                 }
             }
 
@@ -655,30 +826,29 @@ namespace FileSystem
 
         private Dictionary<string, Inode> GetNamesWithInodes(Directory directory)
         {
-            var childrenInodes = GetChildrenInodes(directory);
-            var namesWithInodes = childrenInodes
-                .SelectMany(inodes => inodes.FileNames, (inode, fileName) => (fileName, inode))
-                .ToDictionary(tuple => tuple.fileName, tuple => tuple.inode);
+            var childrenInodes = GetChildrenInodesData(directory);
+            var namesWithInodes = childrenInodes.ToDictionary(tuple => tuple.name, tuple => tuple.inode);
             return namesWithInodes;
         }
 
-        private List<int> GetChildrenIds(Directory directory)
+        private List<(int id, string name)> GetChildrenData(Directory directory)
         {
-            var rawChildrenIds = directory.GetContent().ChildrenInodeIds;
+            var rawChildrenIds = directory.GetContent().ChildrenInodeData;
             var startIndex = Directory.DirectoryContent.DefaultNumOfChildren;
-            List<int> childrenIds = null;
+            List<(int, string)> childrenIds = null;
             if (rawChildrenIds.Count > startIndex)
             {
                 childrenIds = rawChildrenIds.GetRangeByStartIndex(startIndex);
             }
 
-            return childrenIds ?? new List<int>();
+            return childrenIds ?? new List<(int, string)>();
         }
 
-        private List<Inode> GetChildrenInodes(Directory directory)
+        private List<(Inode inode, string name)> GetChildrenInodesData(Directory directory)
         {
-            var childrenIds = GetChildrenIds(directory);
-            var childrenInodes = childrenIds.Select(childId => InodesSection.Inodes[childId]).ToList();
+            var childrenData = GetChildrenData(directory);
+            var childrenInodes = childrenData
+                .Select(childData => (InodesSection.Inodes[childData.id], childData.name)).ToList();
             return childrenInodes;
         }
 
@@ -701,17 +871,17 @@ namespace FileSystem
             while (directoriesQuery.Count > 0 && result.Count < numOfParents)
             {
                 var curDir = directoriesQuery.Dequeue();
-                var children = GetChildrenInodes(curDir);
-                foreach (var child in children)
+                var childrenData = GetChildrenInodesData(curDir);
+                foreach (var childData in childrenData)
                 {
-                    if (child.Id == inode.Id)
+                    if (childData.inode.Id == inode.Id)
                     {
                         result.Add(curDir.Inode);
                     }
 
-                    if (child.FileType == FileType.Directory)
+                    if (childData.inode.FileType == FileType.Directory)
                     {
-                        directoriesQuery.Enqueue(ReadDirectory(child));
+                        directoriesQuery.Enqueue(ReadDirectory(childData.inode));
                     }
                 }
             }
@@ -754,7 +924,8 @@ namespace FileSystem
             {
                 RootDirectory = folder;
             }
-            else if (folder.Inode.Id == CurrentDirectory.Inode.Id)
+
+            if (folder.Inode.Id == CurrentDirectory.Inode.Id)
             {
                 CWDData = (folder, CurrentDirectoryPath);
             }

@@ -31,6 +31,16 @@ namespace FileSystem.Savable
 
         public override RegularFileContent GetContent() => Content.To<RegularFileContent>();
 
+        public override bool Equals(object obj)
+        {
+            if (obj is not RegularFile item)
+            {
+                return false;
+            }
+
+            return Inode.Id == item.Inode.Id;
+        }
+
         public override string ToString() => GetContent().ToString();
     }
 }

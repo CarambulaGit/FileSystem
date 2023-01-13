@@ -15,7 +15,7 @@ namespace FileSystem.Savable
         public struct DirectoryContent
         {
             public const int DefaultNumOfChildren = 2;
-            [NotNull] public List<int> ChildrenInodeIds { get; set; }
+            [NotNull] public List<(int id, string name)> ChildrenInodeData { get; set; }
 
             public override bool Equals(object obj)
             {
@@ -24,22 +24,22 @@ namespace FileSystem.Savable
                     return false;
                 }
 
-                return ChildrenInodeIds.ContentsMatchOrdered(item.ChildrenInodeIds);
+                return ChildrenInodeData.ContentsMatchOrdered(item.ChildrenInodeData);
             }
 
-            public override string ToString() => $"\n\t Children ids = {ChildrenInodeIds.ToStr()}";
+            public override string ToString() => $"\n\t Children ids = {ChildrenInodeData.ToStr()}";
         }
 
         public Directory(Inode inode) : base(inode) { }
 
-        public Directory(Inode inode, int parentDirectoryInodeId) : base(inode)
+        public Directory(Inode inode, int parentDirectoryInodeId, string parentName) : base(inode)
         {
             var content = new DirectoryContent()
             {
-                ChildrenInodeIds = new List<int>()
+                ChildrenInodeData = new List<(int, string)>()
                 {
-                    parentDirectoryInodeId,
-                    inode.Id
+                    (parentDirectoryInodeId, parentName),
+                    (inode.Id, inode.FileNames[0])
                 }
             };
 
@@ -52,7 +52,7 @@ namespace FileSystem.Savable
 
         public int GetParentDirectoryInodeId() => GetParentDirectoryInodeId(GetContent());
 
-        public int GetParentDirectoryInodeId(DirectoryContent directoryContent) => directoryContent.ChildrenInodeIds[0];
+        public int GetParentDirectoryInodeId(DirectoryContent directoryContent) => directoryContent.ChildrenInodeData[0].id;
 
         public override string ToString() => GetContent().ToString();
     }

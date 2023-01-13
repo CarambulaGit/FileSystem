@@ -8,13 +8,13 @@ namespace HardDrive
     [Serializable]
     public class Inode
     {
-        public const int InodeLength = InodeByteLength * 8;
+        public const int InodeLength = InodeByteLength * Constants.BitesInByte;
         public const int InodeByteLength = 1024;
         public int Id { get; set; }
         public List<string> FileNames { get; set; } = new List<string>();
         public FileType FileType { get; set; } = FileType.None;
         public int LinksCount { get; set; }
-        public int FileSize => OccupiedDataBlocks.Length * InodeByteLength;
+        public int FileSize { get; set; }
         public BlockAddress[] OccupiedDataBlocks { get; set; } = Array.Empty<BlockAddress>();
 
         public bool IsOccupied => LinksCount > 0;
@@ -29,6 +29,10 @@ namespace HardDrive
             OccupiedDataBlocks = Array.Empty<BlockAddress>();
         }
 
+        public string ToShortStr(int inodeIdNameIndex) => $"{Id}\t{FileNames[inodeIdNameIndex]}";
+
+        public string ToShortStr(string name) => $"{Id}\t{name}";
+
         public override bool Equals(object obj)
         {
             if (obj is not Inode item)
@@ -40,6 +44,7 @@ namespace HardDrive
                    FileNames.ContentsMatch(item.FileNames) &&
                    FileType.Equals(item.FileType) &&
                    LinksCount.Equals(item.LinksCount) &&
+                   FileSize.Equals(item.FileSize) &&
                    OccupiedDataBlocks.ContentsMatchOrdered(item.OccupiedDataBlocks);
         }
 
@@ -49,6 +54,7 @@ namespace HardDrive
                    $"\tFile Names = {FileNames.ToStr()}\n" +
                    $"\tFile Type = {FileType}\n" +
                    $"\tLinks Count = {LinksCount}\n" +
+                   $"\tFile Size = {FileSize}\n" +
                    $"\tOccupied data blocks = {OccupiedDataBlocks.ToStr()}\n";
         }
     }
