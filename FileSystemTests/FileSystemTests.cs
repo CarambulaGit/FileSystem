@@ -39,7 +39,7 @@ namespace PathResolverTests
         [Test]
         public void CreateFolderTest()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeData.Count;
             var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootDirectoryPath);
             var root = _fileSystem.ReadDirectory(
@@ -53,7 +53,7 @@ namespace PathResolverTests
         [Test]
         public void DeleteFolderTest()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var dir = _fileSystem.CreateDirectory(name, _fileSystem.RootDirectoryPath);
             var numOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeData.Count;
             var folderInode = dir.Inode;
@@ -70,7 +70,7 @@ namespace PathResolverTests
         [Test]
         public void FindInodeTest()
         {
-            var fileName = "Andrew loh";
+            var fileName = "test name";
             var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             var root = _fileSystem.ReadDirectory(
                 _fileSystem.InodesSection.Inodes[FileSystem.FileSystem.RootFolderInodeId]);
@@ -82,7 +82,7 @@ namespace PathResolverTests
         [Test]
         public void CreateRegularFileTest()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeData.Count;
             var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var fileContent = file.GetContent();
@@ -100,7 +100,7 @@ namespace PathResolverTests
         [Test]
         public void DeleteRegularFileTest()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var fileInode = file.Inode;
             var oldNumOfChildren = _fileSystem.RootDirectory.GetContent().ChildrenInodeData.Count;
@@ -118,7 +118,7 @@ namespace PathResolverTests
         [Test]
         public void ChangeCurrentDirectoryTest1()
         {
-            var fileName = "Andrew loh";
+            var fileName = "test name";
             var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             _fileSystem.ChangeCurrentDirectory(fileName);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir.Inode.Id);
@@ -129,7 +129,7 @@ namespace PathResolverTests
         [Test]
         public void ChangeCurrentDirectoryTest2()
         {
-            var fileName = "Andrew loh";
+            var fileName = "test name";
             var dir = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             _fileSystem.ChangeCurrentDirectory(fileName);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir.Inode.Id);
@@ -140,7 +140,7 @@ namespace PathResolverTests
         [Test]
         public void ChangeCurrentDirectoryTest3()
         {
-            var fileName = "Andrew loh";
+            var fileName = "test name";
             var dir1 = _fileSystem.CreateDirectory(fileName, _fileSystem.RootDirectoryPath);
             _fileSystem.ChangeCurrentDirectory(fileName);
             Assert.IsTrue(_fileSystem.CurrentDirectory.Inode.Id == dir1.Inode.Id);
@@ -154,7 +154,7 @@ namespace PathResolverTests
         [Test]
         public void LinkFileTest()
         {
-            var dirName = "Andrew loh";
+            var dirName = "test name";
             var dir = _fileSystem.CreateDirectory(dirName, _fileSystem.RootDirectoryPath);
             var fileName = "file";
             var file = _fileSystem.CreateFile(fileName, _fileSystem.RootDirectoryPath);
@@ -178,7 +178,7 @@ namespace PathResolverTests
         [Test]
         public void UnlinkFileTest()
         {
-            var dirName = "Andrew loh";
+            var dirName = "test name";
             var dir = _fileSystem.CreateDirectory(dirName, _fileSystem.RootDirectoryPath);
             var fileName = "file";
             var file = _fileSystem.CreateFile(fileName, _fileSystem.RootDirectoryPath);
@@ -243,7 +243,7 @@ namespace PathResolverTests
         [Test]
         public void WritingBytesIntoSerializedStringTest()
         {
-            var str = new RegularFile.RegularFileContent() {Text = "Andrew loh"};
+            var str = new RegularFile.RegularFileContent() {Text = "test name"};
             var byteArray = str.ToByteArray();
             var strBytes = byteArray.ToList();
             var toAdd = new byte[] {0, 34, 55, 66};
@@ -256,7 +256,7 @@ namespace PathResolverTests
         [Test]
         public void OpeningFileTest1()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var descriptor = "fd";
             _fileSystem.OpenFile(name, descriptor);
@@ -271,7 +271,7 @@ namespace PathResolverTests
         [Test]
         public void OpeningFileTest2()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var descriptor = "fd";
             _fileSystem.OpenFile(name, descriptor);
@@ -283,7 +283,7 @@ namespace PathResolverTests
         [Test]
         public void TruncateFileTest()
         {
-            var name = "Andrew loh";
+            var name = "test name";
             var file = _fileSystem.CreateFile(name, _fileSystem.RootDirectoryPath);
             var descriptor = "fd";
             _fileSystem.OpenFile(name, descriptor);

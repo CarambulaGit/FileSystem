@@ -150,7 +150,7 @@ namespace SerDesTests
         [Test]
         public void WritingBytesIntoSerializedStringTest()
         {
-            var str = "Andrew loh";
+            var str = "test name";
             var byteArray = str.ToByteArray();
             var strBytes = byteArray.ToList();
             var toAdd = new byte[] {0, 34, 55, 66};
