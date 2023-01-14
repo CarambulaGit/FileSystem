@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using FileSystem;
+using FileSystem.Savable;
 using Microsoft.Extensions.DependencyInjection;
 using SerDes;
+using Utils;
 
 namespace Terminal
 {
@@ -22,7 +24,7 @@ namespace Terminal
 
             while (!_needToExit)
             {
-                if(_fileSystem != null)
+                if (_fileSystem != null)
                     Console.Write($"{_fileSystem.CurrentDirectoryPath}: ");
                 args = Console.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 await rootCommand.InvokeAsync(args);
@@ -123,16 +125,16 @@ namespace Terminal
         private static void SetupTruncateCommand(RootCommand rootCommand)
         {
             var descriptorOption = new Option<string>(
-                    aliases: new[] {"-pf", "--pathToFile"},
+                    aliases: new[] {"-p", "--pathToFile"},
                     description: "Path to file")
                 {IsRequired = true};
 
             var sizeOption = new Option<int>(
                     aliases: new[] {"-s", "--size"},
-                    description: "Number of bytes to read")
+                    description: "Number of bytes to set")
                 {IsRequired = true};
 
-            var truncateCommand = new Command("truncate", "Read bytes from regular file")
+            var truncateCommand = new Command("truncate", "Change size of file in bytes")
             {
                 descriptorOption,
                 sizeOption
@@ -144,7 +146,7 @@ namespace Terminal
         private static void SetupUnlinkCommand(RootCommand rootCommand)
         {
             var pathToFile = new Option<string>(
-                    aliases: new[] {"-pf", "--pathToFile"},
+                    aliases: new[] {"-p", "--pathToFile"},
                     description: "Path to file")
                 {IsRequired = true};
 
@@ -180,12 +182,12 @@ namespace Terminal
         private static void SetupWriteCommand(RootCommand rootCommand)
         {
             var descriptorOption = new Option<string>(
-                    aliases: new[] {"-d", "--descriptor"},
+                    aliases: new[] {"-ds", "--descriptor"},
                     description: "Descriptor for this file")
                 {IsRequired = true};
 
             var dataOption = new Option<string>(
-                    aliases: new[] {"-d", "--data"},
+                    aliases: new[] {"-dt", "--data"},
                     description: "Data to write")
                 {IsRequired = true};
 
@@ -368,10 +370,17 @@ namespace Terminal
             ExceptionHandlerWrapper(() => _fileSystem.SeekFile(descriptor, offset));
 
         private static void ReadFile(string descriptor, int size) =>
-            ExceptionHandlerWrapper(() => _fileSystem.ReadFile(descriptor, size));
+            ExceptionHandlerWrapper(() =>
+                Console.WriteLine(string.Join("", _fileSystem.ReadFile(descriptor, size).Select(b => (char) b))));
 
-        private static void WriteFile(string descriptor, string data) =>
-            ExceptionHandlerWrapper(() => _fileSystem.SaveFile(descriptor, data.ToByteArray()));
+        private static void WriteFile(string descriptor, string data)
+        {
+            ExceptionHandlerWrapper(() =>
+            {
+                var byteArray = data.ToCharArray().Select(chr => (byte) chr).ToArray();
+                _fileSystem.SaveFile(descriptor, byteArray);
+            });
+        }
 
         private static void LinkFile(string pathToFile, string pathForLink) =>
             ExceptionHandlerWrapper(() => _fileSystem.LinkFile(pathToFile, pathForLink));
