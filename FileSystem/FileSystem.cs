@@ -336,6 +336,7 @@ namespace FileSystem
             var linkParentDir = ReadDirectory(parentFolderInode);
             var fileInode = file.Inode;
             AddChildToDirectory(fileInode, splitPathToLink.savableName, linkParentDir);
+            FolderChildChangeCallback(linkParentDir);
             fileInode.FileNames.Add(splitPathToLink.savableName);
             fileInode.LinksCount++;
             InodesSection.SaveInode(fileInode);
