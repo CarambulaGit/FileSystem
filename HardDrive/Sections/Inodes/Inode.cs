@@ -55,7 +55,7 @@ namespace HardDrive
                    $"\tFile Type = {FileType}\n" +
                    $"\tLinks Count = {LinksCount}\n" +
                    $"\tFile Size = {FileSize}\n" +
-                   $"\tOccupied data blocks = {OccupiedDataBlocks.ToStr()}\n";
+                   $"\tOccupied data blocks indexes = {OccupiedDataBlocks.ToStr()}\n";
         }
     }
 }
