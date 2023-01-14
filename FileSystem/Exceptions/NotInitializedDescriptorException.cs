@@ -4,6 +4,9 @@ namespace FileSystem.Exceptions
 {
     public class NotInitializedDescriptorException : Exception
     {
-        public NotInitializedDescriptorException(string descriptor) : base(descriptor) { }
+        private const string DefaultMessage = "Not initialized descriptor";
+
+        public NotInitializedDescriptorException(string descriptor) : base(
+            $"{DefaultMessage}\nDescriptor {descriptor} not found") { }
     }
 }
