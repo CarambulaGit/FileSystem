@@ -13,15 +13,14 @@ namespace FileSystem
             var inodeAmount = 20;
             var dataBlocksAmount = 40;
             var initFromDrive = false;
-            var services = SetupDI(args, (inodeAmount, dataBlocksAmount, initFromDrive));
+            var services = SetupDI((inodeAmount, dataBlocksAmount, initFromDrive));
             var fileSystem = services.GetRequiredService<IFileSystem>();
             fileSystem.Initialize();
         }
 
-        public static IServiceProvider SetupDI(string[] args,
-            (int inodesAmount, int dataBlocksAmount, bool initFromDrive) fileSystemConfiguration)
+        public static IServiceProvider SetupDI((int inodesAmount, int dataBlocksAmount, bool initFromDrive) fileSystemConfiguration)
         {
-            var host = Host.CreateDefaultBuilder(args)
+            var host = Host.CreateDefaultBuilder()
                 .ConfigureServices(services =>
                 {
                     services.AddScoped<IHardDrive, HardDrive.HardDrive>()

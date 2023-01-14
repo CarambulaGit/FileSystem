@@ -457,14 +457,14 @@ namespace FileSystem
 
         #region Symlink/Create
 
-        public Symlink CreateSymlink(string path, string pathToLink)
+        public Symlink CreateSymlink(string pathForLink, string pathToSavable)
         {
-            var absolutePath = _pathResolver.Resolve(path);
+            var absolutePath = _pathResolver.Resolve(pathForLink);
             var splitPath = _pathResolver.SplitPath(absolutePath);
-            return CreateSymlink(splitPath.savableName, splitPath.pathToSavable, _pathResolver.Resolve(pathToLink));
+            return CreateSymlink(splitPath.savableName, splitPath.pathToSavable, _pathResolver.Resolve(pathToSavable));
         }
 
-        public Symlink CreateSymlink(string name, string path, string pathToLink)
+        public Symlink CreateSymlink(string name, string path, string pathToSavable)
         {
             if (!SymlinkNameValid(name))
             {
@@ -477,7 +477,7 @@ namespace FileSystem
             freeInode.LinksCount = symlink.LinksCountDefault();
             freeInode.FileNames.Add(name);
             freeInode.FileType = FileType.Symlink;
-            SaveSymlink(symlink, pathToLink);
+            SaveSymlink(symlink, pathToSavable);
             AddChildToDirectory(freeInode, name, parentFolder);
             FolderChildChangeCallback(parentFolder);
             return symlink;

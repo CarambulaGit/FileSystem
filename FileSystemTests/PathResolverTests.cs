@@ -16,7 +16,7 @@ namespace PathResolverTests
         public void Setup()
         {
             (int inodesAmount, int dataBlocksAmount, bool initFromDrive) fileSystemConfiguration = (20, 40, false);
-            _services = Program.SetupDI(Array.Empty<string>(), fileSystemConfiguration);
+            _services = Program.SetupDI(fileSystemConfiguration);
             _fileSystem = _services.GetRequiredService<IFileSystem>();
             _pathResolver = _services.GetRequiredService<IPathResolver>();
             _fileSystem.Initialize();

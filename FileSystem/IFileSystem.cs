@@ -34,8 +34,8 @@ namespace FileSystem
         void ChangeCurrentDirectory(string path);
         void SaveDirectory(Directory directory, Directory.DirectoryContent content);
         void SaveFile(RegularFile file, RegularFile.RegularFileContent content);
-        Symlink CreateSymlink(string path, string pathToLink);
-        Symlink CreateSymlink(string name, string path, string pathToLink);
+        Symlink CreateSymlink(string pathForLink, string pathToSavable);
+        Symlink CreateSymlink(string name, string path, string pathToSavable);
         Symlink ReadSymlink(string path);
         Symlink ReadSymlink(Inode inode);
         void SaveSymlink(Symlink symlink);
