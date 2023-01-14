@@ -74,7 +74,8 @@ namespace FileSystem
 
             var indexOfLastSplitter = absolutePath.LastIndexOf(Separator);
             var splitResult = absolutePath.SplitByIndex(indexOfLastSplitter);
-            splitResult = ($"{Separator}{splitResult.first}", splitResult.second);
+            var first = splitResult.first.StartsWith(Separator) ? splitResult.first : $"{Separator}{splitResult.first}";
+            splitResult = (first, splitResult.second);
             return splitResult;
         }
 
